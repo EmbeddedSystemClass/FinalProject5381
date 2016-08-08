@@ -16,3 +16,6 @@ latex
 .metadata
 .waf*
 .pyc
+*.zip
+out*.*
+.DS_Store
