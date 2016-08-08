@@ -44,6 +44,13 @@ Although 3 options were given, I'll be attempting them all.
 - Add a I2C/SPI based temp/hum sensor
 - Whenever light state changes (on -> off; off -> on), display both temp and hum
 
+##Features (Custom) ##
+
+### Quad display stick
+- Add support for a multi-digit display from Adafruit (Arduino house).
+- See product here: https://www.adafruit.com/product/1912
+- This will typically use the I2C bus.
+
 ## Project Submission Guidelines
 - Submit just one zip file – with all the project files. I should be able to import it and run succesfully.
 - Make a simple/quick video of the working demo from you phone and submit the video
