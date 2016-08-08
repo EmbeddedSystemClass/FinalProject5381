@@ -582,7 +582,7 @@ int main( void )
 		pirEdgeParams.cmdCode = CMD_OCC_EVENT;
 		pirEdgeParams.sampleRateMsec = EDGE_SAMPLE_RATE_MS;
 		pirEdgeParams.lastValue = 0;
-		xTaskCreate(	vTaskADCQDebouncer,		/* Pointer to the function that implements the task. */
+		xTaskCreate(	vTaskEdgeDetector,		/* Pointer to the function that implements the task. */
 						"PIR Edges",	/* Text name for the task.  This is to facilitate debugging only. */
 						240,		/* Stack depth in words. */
 						(void *) &pirEdgeParams,		/* Pass the param pointer in the task parameter. */
