@@ -61,7 +61,7 @@ Although 3 options were given, I'll be attempting them all.
 - Timers
 - Semaphores, etc. used
 - Also show the data flow between components
-- - Please also write a few lines in the text:
+- Please also write a few lines in the text:
 - At what reading of the light sensor your code lights up/off the bulb (thresholds)
 - If doing bonus: mention the 7-segment display scale
 - Nothing fancy:
