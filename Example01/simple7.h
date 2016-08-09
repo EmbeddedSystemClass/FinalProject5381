@@ -16,6 +16,7 @@ void s7_writeBinary(int value, int useDP);
 
 // ADDED - overflow feature; turns DP on if out of range 0-15 (and displays value modulo that range)
 void s7_writeBinaryDP(int value);
+int s7_getDataRange(void); // this will return the data range accepted (currently 16, assuming 0-15 are valid)
 
 // write an ASCII character with given value and optional decimal point
 // valid character inputs are digits, letters A-F or a-f, comma, period

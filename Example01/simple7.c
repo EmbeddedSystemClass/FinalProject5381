@@ -221,9 +221,10 @@ void s7_writeBinary(int value, int useDP)
 }
 
 // ADDED - overflow feature; turns DP on if out of range 0-15 (and displays value modulo that range)
+int s7_getDataRange(void) { return 16; }
 void s7_writeBinaryDP(int value)
 {
-	int RANGE = 16;
+	int RANGE = s7_getDataRange();
 	int useDPint = (value >= RANGE)? 1: 0;
 	int valueInt = value % RANGE;
 	s7_writeBinary(valueInt, useDPint);

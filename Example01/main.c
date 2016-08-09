@@ -405,8 +405,6 @@ void vTaskDataConcentrator( void *pvParameters )
 			// interpret the ADC value as DARK or LIGHT brightness level (actually many levels now)
 			ldrReading = currentCmd.data;
 			ambient = getAmbientLightingLevel(ldrReading);
-			// determine the smart bulb state from provided conditions (ambient lighting, room occupancy)
-			brightness = getSmartBulbState( ambient, occupancy );
 			updated = TRUE;
 			break;
 		case CMD_PIR_DATA:
@@ -423,8 +421,6 @@ void vTaskDataConcentrator( void *pvParameters )
 			if (currentCmd.data != 0)
 				occ_motion_detected(); // generate the occupancy change if edge event (motion)
 			occupancy = getOccupancy();
-			// determine the smart bulb state from provided conditions (ambient lighting, room occupancy)
-			brightness = getSmartBulbState( ambient, occupancy );
 			updated = TRUE;
 			break;
 		case CMD_PB_PRESS:
@@ -438,12 +434,19 @@ void vTaskDataConcentrator( void *pvParameters )
 		}
 
 		if (updated) {
+			// determine the smart bulb state from provided conditions (ambient lighting, room occupancy)
+			brightness = getSmartBulbState( ambient, occupancy );
+
 			// once the brightness level is known, we can set the on-board LED color with the current mode
 			int bulbColor = selectBulbColor(brightness, mode);
-
-			// send this data to the output queue(s)
+			// send this data to the LED output queue(s)
 			xQueueOverwrite(xBulbQueue, &bulbColor); // LED gets smart bulb output level
-			xQueueOverwrite(xSimple7Queue, &brightness); // 7SEG display gets brightness level
+
+			// process the conditions (ambient lighting, room occupancy) into proper output for the 7SEG display
+			extern int getAmbientDisplayCode(int ambient, int occupancy, int mode);
+			int codedAmbient = getAmbientDisplayCode(ambient, occupancy, mode);
+			// send this data to the 7SEG output queue
+			xQueueOverwrite(xSimple7Queue, &codedAmbient);
 
 			/* Print out the name of this task and the current values read. */
 			ldrmv = frac2MV(ldrReading, ADC_MAX_INPUT);
@@ -475,10 +478,26 @@ void vTaskLEDOutput( void *pvParameters )
 /*-----------------------------------------------------------*/
 //	TASK - SIMPLE SEVEN-SEGMENT DISPLAY OUTPUT DRIVER
 /*-----------------------------------------------------------*/
+int getAmbientDisplayCode(int ambient, int occupancy, int mode) {
+	int output = ambient; // since we can't negate 0
+	// this will turn on the decimal point if room is occupied
+	output += (occupancy == 0)? 0: s7_getDataRange();
+	if (mode == MODE_ALWAYS_OFF) {
+		// test mode: special code to kick off the 7SEG Test task sequence
+		// this sequence ends when normal data is written, i.e., when we exit the test mode
+		output = -1;
+	}
+	return output;
+}
+
+#define TEST_SEQ_DELAY (1000 / portTICK_RATE_MS)
+
 void vTaskSimple7Output( void *pvParameters )
 {
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
+	int testData = 0;
+	int testMax = s7_getNumberOfTestPatterns();
 	for( ;; )
 	{
 		// read data from queue and process it with output to led
@@ -486,9 +505,40 @@ void vTaskSimple7Output( void *pvParameters )
 		xQueueReceive(xSimple7Queue, &data, portMAX_DELAY);
 
 		// process data with output to onboard LED
-		s7_writeBinaryDP(data);
-//		printf("7SEG = %d\n", data);
-		//s7_writeTest(data); // not using DP for now
+		if (data >= 0) {
+			s7_writeBinaryDP(data);
+			//printf("7SEG = %d\n", data);
+		}
+		else {
+			// special code for test sequence
+			testData = 0;
+			for( ;; )
+			{
+				// peek data from queue to detect return to normal data (>=0)
+				data = -1; // in case of timeout, stay in test sequence mode
+				// also if data changes happen, the queue still is set to -1, so we stay in test seq.mode
+				int iPeekResult = xQueuePeek(xSimple7Queue, &data, 0);
+
+				if (data >= 0) {
+					// return to normal loop processing
+					break;
+				}
+				else {
+					// if a -1 was in the queue, read it before returning to peek/timeout test
+					if (iPeekResult == pdTRUE) {
+						// read without delay, and ignore the received data (it will be -1)
+						xQueueReceive(xSimple7Queue, &data, 0);
+					}
+					// write the next test sequence pattern, with wraparound
+					s7_writeTest(testData++);
+					if (testData >= testMax)
+						testData = 0;
+					// wait for a timeout (ignores data during this time, so make it short I suppose)
+					vTaskDelay(TEST_SEQ_DELAY);
+					// now, back to the peek loop to check for sequence commands (real data or -1 or timeouts)
+				}
+			}
+		}
 	}
 }
 
