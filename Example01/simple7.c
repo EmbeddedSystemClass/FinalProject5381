@@ -164,7 +164,7 @@ CharBitPattern getAsciiDigitOutput(char asciiChar, int useDP) {
 	case '7':
 	case '8':
 	case '9':
-		retval = hexFont[0 + asciiChar];
+		retval = hexFont[asciiChar - '0'];
 		break;
 	case 'a':
 	case 'A':
@@ -197,7 +197,9 @@ CharBitPattern getAsciiDigitOutput(char asciiChar, int useDP) {
 	default:
 		break;
 	}
-	return getHexDigitOutput(retval, useDP);
+	if (useDP)
+		retval |= testFont[8];
+	return retval;
 }
 
 // get number of test patterns

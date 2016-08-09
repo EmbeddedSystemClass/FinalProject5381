@@ -28,43 +28,53 @@ Although 3 options were given, I'll be attempting them all.
 - Pressing the push button second time -> switch off light and go back to the smart bulb mode
 
 ##Features (Option 1)
-###Level C (Bonus: +5 marks)
+###Level C1 (Bonus: +5 marks)
 - Add a seven segment display (use gpio to control each led inside 7 segment)
 - This should display the level of light as seen on the light sensor
-- Choose a simple scale of your choice: example 0 -> dark; 8 -> max light.
+- Choose a simple scale of your choice: 0 -> dark; 8 -> max light (this scale was used).
+- **(Custom)** I added a segment test sequence mode to verify proper operation of the display.
 
 ##Features (Option 2)
-###Level C (Bonus: +5 marks)
+###Level C2 (Bonus: +5 marks)
 - Add a PIR occupancy sensor (GPIO)
 - Link: https://www.adafruit.com/products/189
 - Make smart bulb decisions based on both light as well as occupancy
+- **(Custom)** The Decimal Point on the 7-segment display lights up when the room is occupied.
 
 ##Features (Option 3)
-###Level C (Bonus: +10 marks)
+###Level C3 (Bonus: +10 marks)
 - Add a I2C/SPI based temp/hum sensor
 - Whenever light state changes (on -> off; off -> on), display both temp and hum
 
 ##Features (Custom) ##
-
-### Quad display stick
+###Level C4 Quad display stick
 - Add support for a multi-digit display from Adafruit (Arduino house).
 - See product here: https://www.adafruit.com/product/1912
-- This will typically use the I2C bus.
+- This will use the I2C2 bus.
 
 ## Project Submission Guidelines
-- Submit just one zip file – with all the project files. I should be able to import it and run succesfully.
-- Make a simple/quick video of the working demo from you phone and submit the video
-- A simple / quick document of the s/w design, a block diagram or a flow diagram showing any of the following components implemented:
+
+Submit just one zip file – with all the project files. I should be able to import it and run succesfully.
+
+Make a simple/quick video of the working demo from you phone and submit the video
+
+A simple / quick document of the s/w design, a block diagram or a flow diagram showing any of the following components implemented:
+
 - Tasks
-- 2. message queues
+- Message queues
 - ISRs and bottom-halves
 - Timers
 - Semaphores, etc. used
-- Also show the data flow between components
-- Please also write a few lines in the text:
+
+Also show the data flow between components
+
+Please also write a few lines in the text:
+
 - At what reading of the light sensor your code lights up/off the bulb (thresholds)
 - If doing bonus: mention the 7-segment display scale
-- Nothing fancy:
+
+Nothing fancy:
+
 - Make sure your video has enough light
 - The document should be ideally in doc, but can be on a white sheet and scan it.
 - Deadline: Sep 1st is the deadline (11:59 pm)

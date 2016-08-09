@@ -53,6 +53,11 @@
 #include "simple7.h"
 
 //#define DACOUTPUT // uncomment this line to add support for DAC output for optional ADC testing
+#define TEST_SEQUENCES // uncomment this line to add support for sequence testing, such as the 7-segment display
+
+#ifdef TEST_SEQUENCES
+#define TEST_7SEGMENTS
+#endif
 
 /*-----------------------------------------------------------*/
 //  APP OPERATION MODES (PB SELECTABLE STATE TRANSITIONS)
@@ -61,6 +66,7 @@ enum {
 	MODE_SMART_BULB,
 	MODE_ALWAYS_ON,
 	MODE_ALWAYS_OFF,
+	MODE_TEST_SEQ,
 };
 
 int getNextMode(int curMode, int debug_type) {
@@ -74,6 +80,11 @@ int getNextMode(int curMode, int debug_type) {
 	case MODE_ALWAYS_ON:
 		output = debug? MODE_ALWAYS_OFF : MODE_SMART_BULB;
 		break;
+#ifdef TEST_SEQUENCES
+	case MODE_ALWAYS_OFF:
+		output = MODE_TEST_SEQ;
+		break;
+#endif
 	default:
 		output = MODE_SMART_BULB;
 		break;
@@ -209,7 +220,7 @@ int getSmartBulbState(int ambientLightLevel, int roomOccupancyLevel) {
 int selectBulbColor(int bulbBrightness, int mode) {
 	// this switch statement tries to arrange output colors in order of brightness
 	int bulb = bulbBrightness;
-	if (mode == MODE_ALWAYS_OFF)
+	if (mode == MODE_ALWAYS_OFF || mode == MODE_TEST_SEQ)
 		bulb = 0;
 	if (mode == MODE_ALWAYS_ON)
 		bulb = 8;
@@ -482,22 +493,63 @@ int getAmbientDisplayCode(int ambient, int occupancy, int mode) {
 	int output = ambient; // since we can't negate 0
 	// this will turn on the decimal point if room is occupied
 	output += (occupancy == 0)? 0: s7_getDataRange();
-	if (mode == MODE_ALWAYS_OFF) {
+#ifdef TEST_7SEGMENTS
+	if (mode == MODE_TEST_SEQ) {
 		// test mode: special code to kick off the 7SEG Test task sequence
 		// this sequence ends when normal data is written, i.e., when we exit the test mode
 		output = -1;
 	}
+#endif
 	return output;
 }
 
+#ifdef TEST_7SEGMENTS
 #define TEST_SEQ_DELAY (1000 / portTICK_RATE_MS)
+
+void programTests(int testProgram[], int* finalIndex, int* finalHexIndex, int* finalTestIndex) {
+	int index = 0;
+	int hexTestMax = s7_getDataRange();
+	int testMax = s7_getNumberOfTestPatterns();
+	int testProgramMax = 0;
+	// program hex font tests (32)
+	// all hex digits
+	for (index=0; index<hexTestMax; ++index) {
+		testProgram[testProgramMax++] = index;
+	}
+	// all hex digits w.decimal point
+	for (index=0; index<hexTestMax; ++index) {
+		testProgram[testProgramMax++] = index + hexTestMax;
+	}
+	// save high water mark so far
+	*finalHexIndex = testProgramMax;
+	// program test font tests
+	for (index=0; index<testMax; ++index) {
+		testProgram[testProgramMax++] = index;
+	}
+	// save high water mark so far
+	*finalTestIndex = testProgramMax;
+	// program ascii font tests (29)
+	const char* txt = "C9876543210.,dDeEaAdDbBeEeEfF";
+	for (index=0; index<29; ++index) {
+		testProgram[testProgramMax++] = txt[index];
+	}
+	// save high water mark so far
+	*finalIndex = testProgramMax;
+}
+#endif
 
 void vTaskSimple7Output( void *pvParameters )
 {
+	// One-time setup for test sequence.
+	int testData = 0;
+#ifdef TEST_7SEGMENTS
+	static int testProgram[100]; // room for expansion
+	int testProgramMax, useTestAfter, useAsciiAfter;
+	programTests(testProgram, &testProgramMax, &useTestAfter, &useAsciiAfter);
+#endif
+
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
-	int testData = 0;
-	int testMax = s7_getNumberOfTestPatterns();
 	for( ;; )
 	{
 		// read data from queue and process it with output to led
@@ -509,6 +561,7 @@ void vTaskSimple7Output( void *pvParameters )
 			s7_writeBinaryDP(data);
 			//printf("7SEG = %d\n", data);
 		}
+#ifdef TEST_7SEGMENTS
 		else {
 			// special code for test sequence
 			testData = 0;
@@ -529,9 +582,17 @@ void vTaskSimple7Output( void *pvParameters )
 						// read without delay, and ignore the received data (it will be -1)
 						xQueueReceive(xSimple7Queue, &data, 0);
 					}
-					// write the next test sequence pattern, with wraparound
-					s7_writeTest(testData++);
-					if (testData >= testMax)
+					// write the next test element in the sequence pattern
+					data = testProgram[testData];
+					if (testData >= useAsciiAfter)
+						s7_writeAscii(data, 0);
+					else if (testData >= useTestAfter)
+						s7_writeTest(data);
+					else
+						s7_writeBinaryDP(data);
+					// index the test sequence pattern, with wraparound
+					++testData;
+					if (testData >= testProgramMax)
 						testData = 0;
 					// wait for a timeout (ignores data during this time, so make it short I suppose)
 					vTaskDelay(TEST_SEQ_DELAY);
@@ -539,6 +600,7 @@ void vTaskSimple7Output( void *pvParameters )
 				}
 			}
 		}
+#endif
 	}
 }
 
