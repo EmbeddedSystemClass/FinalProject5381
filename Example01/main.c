@@ -50,6 +50,7 @@
 #include "adc.h"
 #include "led.h"
 #include "pb.h"
+#include "simple7.h"
 
 //#define DACOUTPUT // uncomment this line to add support for DAC output for optional ADC testing
 
@@ -441,8 +442,8 @@ void vTaskDataConcentrator( void *pvParameters )
 			int bulbColor = selectBulbColor(brightness, mode);
 
 			// send this data to the output queue(s)
-			xQueueOverwrite(xBulbQueue, &bulbColor);
-			xQueueOverwrite(xSimple7Queue, &bulbColor);
+			xQueueOverwrite(xBulbQueue, &bulbColor); // LED gets smart bulb output level
+			xQueueOverwrite(xSimple7Queue, &brightness); // 7SEG display gets brightness level
 
 			/* Print out the name of this task and the current values read. */
 			ldrmv = frac2MV(ldrReading, ADC_MAX_INPUT);
@@ -485,7 +486,9 @@ void vTaskSimple7Output( void *pvParameters )
 		xQueueReceive(xSimple7Queue, &data, portMAX_DELAY);
 
 		// process data with output to onboard LED
-//		printf("TBD - Simple 7-segment LED output = %d\n", data);
+		s7_writeBinaryDP(data);
+//		printf("7SEG = %d\n", data);
+		//s7_writeTest(data); // not using DP for now
 	}
 }
 
@@ -531,6 +534,8 @@ int main( void )
 	pb_init(GPIO_CHANNEL);
 	// init the edge detection system
 	occ_init();
+	// init the 7-segment LED GPIO pins
+	s7_init();
 
 	// set up the command and data queues
 	xCommandQueue = xQueueCreate( COMMAND_QUEUE_LENGTH, sizeof(Command) );
