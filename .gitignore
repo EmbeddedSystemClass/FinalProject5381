@@ -19,3 +19,4 @@ latex
 *.zip
 out*.*
 .DS_Store
+~*.*
