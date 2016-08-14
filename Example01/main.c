@@ -51,12 +51,19 @@
 #include "led.h"
 #include "pb.h"
 #include "simple7.h"
+#include "bmpe.h"
 
 //#define DACOUTPUT // uncomment this line to add support for DAC output for optional ADC testing
 #define TEST_SEQUENCES // uncomment this line to add support for sequence testing, such as the 7-segment display
 
 #ifdef TEST_SEQUENCES
 #define TEST_7SEGMENTS
+#endif
+
+#ifdef DBGPRINTF
+#define DBGOUTX printf
+#else
+#define DBGOUTX
 #endif
 
 /*-----------------------------------------------------------*/
@@ -103,29 +110,51 @@ enum {
 	CMD_PIR_DATA,
 	CMD_OCC_EVENT,
 	CMD_PB_PRESS,
+	CMD_BMPE_FIRST_EVENT,
+	CMD_BMPE_TEMP_DATA = CMD_BMPE_FIRST_EVENT,
+	CMD_BMPE_PRESS_DATA,
+	CMD_BMPE_HUMID_DATA,
+	CMD_BMPE_ALT_DATA,
 };
 typedef struct s_Command {
 	char code; // use above enum CMD_*
 	int data;
 } Command;
+#define COMMAND_QUEUE_SIZE (sizeof(Command))
 
 /*-----------------------------------------------------------*/
 //	DATA QUEUE - EDGE DETECTION FROM DATA STREAM
 /*-----------------------------------------------------------*/
 QueueHandle_t xEdgeDetectQueue = NULL;
 #define EDGE_QUEUE_LENGTH (1)
+#define EDGE_QUEUE_SIZE (sizeof(int))
 
 /*-----------------------------------------------------------*/
 //	DATA QUEUE - SMART BULB OUTPUT DRIVER
 /*-----------------------------------------------------------*/
 QueueHandle_t xBulbQueue = NULL;
 #define BULB_QUEUE_LENGTH (1)
+#define BULB_QUEUE_SIZE (sizeof(int))
 
 /*-----------------------------------------------------------*/
 //	DATA QUEUE - SIMPLE SEVEN SEGMENT OUTPUT DRIVER
 /*-----------------------------------------------------------*/
 QueueHandle_t xSimple7Queue = NULL;
 #define SIMPLE7_QUEUE_LENGTH (1)
+#define SIMPLE7_QUEUE_SIZE (sizeof(int))
+
+/*-----------------------------------------------------------*/
+//	DATA QUEUE - DISPLAY OUTPUT DRIVER
+/*-----------------------------------------------------------*/
+QueueHandle_t xDisplayQueue = NULL;
+#define DISPLAY_QUEUE_LENGTH (1)
+typedef struct {
+	float temp;
+	float press;
+	float humid;
+	float altitude;
+} DisplayResult;
+#define DISPLAY_QUEUE_SIZE (sizeof(DisplayResult))
 
 /*-----------------------------------------------------------*/
 //  AMBIENT LIGHTING CONVERSION
@@ -266,7 +295,7 @@ void vTaskADCInput( void *pvParameters )
 	{
 		// read the current value of the ADC
 		int value = adc_read_single(params->channel);
-//		printf("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
+//		DBGOUTX("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
 
 		// only send values that are different from the last sample
 		if (params->lastValue != value)
@@ -357,6 +386,63 @@ void vTaskEdgeDetector( void *pvParameters )
 	}
 }
 
+/*-----------------------------------------------------------*/
+//	TASK - TEMP/HUMIDITY SENSOR INPUT DRIVER (SPI)
+/*-----------------------------------------------------------*/
+int createBMPEChangeCode(float temp, float press, float alt, float humid) {
+	static int val = 1;
+	// TODO: convert each float to relevant 8-bit int range, then encode to 32-bit #
+	// for now, just assign consecutive numbers so all values get displayed
+	return val++;
+}
+
+void vTaskBMPEInput( void* pvParameters ) {
+	SampleParams *params = (SampleParams *)pvParameters;
+
+/* As per most tasks, this task is implemented in an infinite loop. */
+	for( ;; )
+	{
+		// read the current values of the sensor data (temp, press, alt, and poss.humid)
+		float temper = bmpe_readTemperature();
+		float press = bmpe_readPressure();
+		float alt = bmpe_readAltitude();
+		float humid = bmpe_readHumidity();
+		// create a 4-byte condensed code to detect drastic changes
+		int value = createBMPEChangeCode(temper, press, alt, humid); //adc_read_single(params->channel);
+//		DBGOUTX("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
+
+		// only send values that are different from the last sample
+		if (params->lastValue != value)
+		{
+			// save the new value for next time
+			params->lastValue = value;
+			//int currentCode = params->cmdCode;
+			// send the data commands to the command queue
+			Command command;
+			command.code = CMD_BMPE_TEMP_DATA;
+			command.data = temper;
+			// send the data; by using 0 delay, we just drop data if the queue is full
+			xQueueSendToBack(xCommandQueue, &command, 0);
+			command.code = CMD_BMPE_PRESS_DATA;
+			command.data = press;
+			// send the data; by using 0 delay, we just drop data if the queue is full
+			xQueueSendToBack(xCommandQueue, &command, 0);
+			command.code = CMD_BMPE_HUMID_DATA;
+			command.data = humid;
+			// send the data; by using 0 delay, we just drop data if the queue is full
+			xQueueSendToBack(xCommandQueue, &command, 0);
+			// NOTE: Make sure the last event sent (which triggers output) is NOT optional
+			command.code = CMD_BMPE_ALT_DATA;
+			command.data = alt;
+			// send the data; by using 0 delay, we just drop data if the queue is full
+			xQueueSendToBack(xCommandQueue, &command, 0);
+		}
+
+		// add any optional delay here - otherwise just read and print in a tight loop
+		vTaskDelay( params->sampleRateMsec / portTICK_RATE_MS );
+	}
+}
+
 #ifdef DACOUTPUT
 /*-----------------------------------------------------------*/
 //	TASK - SEND TRIANGLE WAVE (RAMP) TO DAC
@@ -375,7 +461,7 @@ unsigned int ul = 0;
 		/* Print out the name of this task. */
 		int value = (ul & 0x3ff);
 		int mv = frac2MV(value, 1024);
-//		printf( "***>>> Task 2: DAC setting = %d/1024 = %d/4096, output (mv) = %d\n", value, value << 2, mv );
+//		DBGOUTX( "***>>> Task 2: DAC setting = %d/1024 = %d/4096, output (mv) = %d\n", value, value << 2, mv );
 
 		// output an ever-increasing value to the DAC (will be converted into a 10-bit fraction internally by bit masking)
 		// This should output a stair-step wave on AOUT at a frequency set by the delay value
@@ -401,6 +487,10 @@ void vTaskDataConcentrator( void *pvParameters )
 	int occupancy = 1; // room occupancy level
 	int brightness = 0; // Smart Bulb brightness setting
 	int mode = MODE_SMART_BULB; // application operation mode (PB setting)
+	int temperatureReading = 0; // from the optional BMPE sensor
+	int pressureReading = 0; // from the BMPE sensor
+	int altitudeReading = 0; // from the BMPE sensor
+	int humidityReading = 0; // from the BMPE sensor
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 	for( ;; )
@@ -408,7 +498,8 @@ void vTaskDataConcentrator( void *pvParameters )
 		// read command/data from queue and process it with output to display(s)
 		Command currentCmd;
 		xQueueReceive(xCommandQueue, &currentCmd, portMAX_DELAY);
-		int updated = FALSE;
+		int updated = FALSE; // updates needed to go to common indicators (LED, 7SEG)
+		int updatedEnv = FALSE; // update needed to go to optional display (OLED)
 
 		switch (currentCmd.code)
 		{
@@ -423,8 +514,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			//occupancy = 1; // version overriding sensor
 			pirReading = currentCmd.data;
 			pirmv = frac2MV(pirReading, ADC_MAX_INPUT);
-//			printf( "Data task: PIR reading=%d/4096, input (mv)=%d\n",
-//								pirReading, pirmv );
+			DBGOUTX( "PIR=%d, mv=%d\n", pirReading, pirmv );
 			xQueueOverwrite(xEdgeDetectQueue, &pirReading);
 			break;
 		case CMD_OCC_EVENT:
@@ -432,6 +522,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			if (currentCmd.data != 0)
 				occ_motion_detected(); // generate the occupancy change if edge event (motion)
 			occupancy = getOccupancy();
+			DBGOUTX( "**   OCC=%d   **\n", occupancy );
 			updated = TRUE;
 			break;
 		case CMD_PB_PRESS:
@@ -440,14 +531,37 @@ void vTaskDataConcentrator( void *pvParameters )
 			mode = getNextMode(mode, 1); // 2nd param includes total shutoff for debug purposes
 			updated = TRUE;
 			break;
+		case CMD_BMPE_TEMP_DATA:
+			// interpret the sensor values as appropriate (integer assumed to have N decimals
+			temperatureReading = currentCmd.data;
+			// intermediate data value - no update yet
+			break;
+		case CMD_BMPE_PRESS_DATA:
+			// interpret the sensor values as appropriate (integer assumed to have N decimals
+			pressureReading = currentCmd.data;
+			// intermediate data value - no update yet
+			break;
+		case CMD_BMPE_HUMID_DATA:
+			// interpret the sensor values as appropriate (integer assumed to have N decimals
+			humidityReading = currentCmd.data;
+			// intermediate data value - no update yet
+			break;
+		case CMD_BMPE_ALT_DATA:
+			// interpret the sensor values as appropriate (integer assumed to have N decimals
+			altitudeReading = currentCmd.data;
+			// since this is the last of four always sent together, allow env.display updates now
+			updatedEnv = TRUE;
+			break;
 		default:
 			break;
 		}
 
 		if (updated) {
+			// if any of the following are updated: ambient, occupancy, mode
+			// then we need to send the output to the Bulb/LED, 7SEG, and DEBUG queues/tasks
+
 			// determine the smart bulb state from provided conditions (ambient lighting, room occupancy)
 			brightness = getSmartBulbState( ambient, occupancy );
-
 			// once the brightness level is known, we can set the on-board LED color with the current mode
 			int bulbColor = selectBulbColor(brightness, mode);
 			// send this data to the LED output queue(s)
@@ -459,10 +573,24 @@ void vTaskDataConcentrator( void *pvParameters )
 			// send this data to the 7SEG output queue
 			xQueueOverwrite(xSimple7Queue, &codedAmbient);
 
+			// DEBUG: no separate task, just output immediately
 			/* Print out the name of this task and the current values read. */
 			ldrmv = frac2MV(ldrReading, ADC_MAX_INPUT);
-//			printf( "Data task: LDR reading=%d/4096, input (mv)=%d, ambient=%d, occup=%d, BRT=%d, MODE=%d, color=%d\n",
-//					ldrReading, ldrmv, ambient, occupancy, brightness, mode, bulbColor );
+			DBGOUTX( "Data task: LDR reading=%d/4096, input (mv)=%d, ambient=%d, occup=%d, BRT=%d, MODE=%d, color=%d\n",
+					ldrReading, ldrmv, ambient, occupancy, brightness, mode, bulbColor );
+		}
+
+		if (updatedEnv) {
+			// if we have changes in relevant data, update the environment display (OLED)
+			// Now Showing: temperature, pressure, humidity, altitude (abs/rel)
+			DisplayResult resData;
+			resData.temp = temperatureReading;
+			resData.press = pressureReading;
+			resData.humid = humidityReading;
+			resData.altitude = altitudeReading;
+			//resData.refAlt = altitudeReference;
+			// send this data to the OLED output queue(s)
+			xQueueOverwrite(xDisplayQueue, &resData);
 		}
 
 	}
@@ -559,7 +687,7 @@ void vTaskSimple7Output( void *pvParameters )
 		// process data with output to onboard LED
 		if (data >= 0) {
 			s7_writeBinaryDP(data);
-			//printf("7SEG = %d\n", data);
+			//DBGOUTX("7SEG = %d\n", data);
 		}
 #ifdef TEST_7SEGMENTS
 		else {
@@ -605,12 +733,22 @@ void vTaskSimple7Output( void *pvParameters )
 }
 
 /*-----------------------------------------------------------*/
-//	TASK - QUAD DISPLAY (I2C) OUTPUT DRIVER
+//	TASK - OLED DISPLAY (I2C) OUTPUT DRIVER
 /*-----------------------------------------------------------*/
+void vTaskOLEDOutput( void* pvParameters ) {
+	/* As per most tasks, this task is implemented in an infinite loop. */
 
-/*-----------------------------------------------------------*/
-//	TASK - TEMP/HUMIDITY SENSOR INPUT DRIVER (SPI)
-/*-----------------------------------------------------------*/
+	for( ;; )
+	{
+		// read data from queue and process it with output to led
+		DisplayResult data;
+		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
+
+		// process data with output to OLED multiline display
+		DBGOUTX("Temperature(deg.C): %d\nPressure(hPa): %d\nHumidity(?): %d\nAltitude(m): %d\n",
+				data.temp, data.press, data.humid, data.altitude);
+	}
+}
 
 /*-----------------------------------------------------------*/
 #define LDR_CHANNEL (0) // ADC input channel 0-7
@@ -629,10 +767,17 @@ SampleParams pirParams;
 #define EDGE_SAMPLE_RATE_MS (0)
 SampleParams pirEdgeParams;
 
+#define BMPE_CHANNEL (0) // SPI channel 0 with SSEL0
+#define BMPE_SAMPLE_RATE_MS (5000)
+SampleParams bmpeParams;
+
+int bmpeType = BMPE_NONE; // global feature: what kind of environment sensor
+int initProgress = 0; // debug code
+
 int main( void )
 {
 	/* Init the semi-hosting. */
-	printf( "\n" );
+	DBGOUTX( "\n" );
 	// init the ADC system (for LDR reading) and DAC (for testing)
 	adc_init();
 #ifdef DACOUTPUT
@@ -648,17 +793,32 @@ int main( void )
 	occ_init();
 	// init the 7-segment LED GPIO pins
 	s7_init();
+	// init the BMP/BME sensor system
+	bmpeType = bmpe_init();
+	switch (bmpeType) {
+	case BMPE_BMPTYPE:
+		DBGOUTX("Using BMP temperature/pressure sensor.\n");
+		break;
+	case BMPE_BMETYPE:
+		DBGOUTX("Using BMP temperature/pressure/humidity sensor.\n");
+		break;
+	}
+	initProgress = 1;
 
 	// set up the command and data queues
-	xCommandQueue = xQueueCreate( COMMAND_QUEUE_LENGTH, sizeof(Command) );
-	xEdgeDetectQueue = xQueueCreate( EDGE_QUEUE_LENGTH, sizeof(int) );
-	xBulbQueue = xQueueCreate( BULB_QUEUE_LENGTH, sizeof(int) );
-	xSimple7Queue = xQueueCreate( SIMPLE7_QUEUE_LENGTH, sizeof(int) );
+	xCommandQueue = xQueueCreate( COMMAND_QUEUE_LENGTH, COMMAND_QUEUE_SIZE );
+	initProgress = 2;
+	xEdgeDetectQueue = xQueueCreate( EDGE_QUEUE_LENGTH, EDGE_QUEUE_SIZE );
+	xBulbQueue = xQueueCreate( BULB_QUEUE_LENGTH, BULB_QUEUE_SIZE );
+	xSimple7Queue = xQueueCreate( SIMPLE7_QUEUE_LENGTH, SIMPLE7_QUEUE_SIZE );
+	xDisplayQueue = xQueueCreate( DISPLAY_QUEUE_LENGTH, DISPLAY_QUEUE_SIZE );
+	initProgress = 3;
 	int tester = TRUE;
 	tester = tester && (xCommandQueue != NULL);
 	tester = tester && (xEdgeDetectQueue != NULL);
 	tester = tester && (xBulbQueue != NULL);
 	tester = tester && (xSimple7Queue != NULL);
+	tester = tester && (xDisplayQueue != NULL);
 	if (tester) {
 
 		/* Create input tasks. */
@@ -668,10 +828,11 @@ int main( void )
 		ldrParams.lastValue = -1;
 		xTaskCreate(	vTaskADCInput,		/* Pointer to the function that implements the task. */
 						"LDR Input",	/* Text name for the task.  This is to facilitate debugging only. */
-						240,		/* Stack depth in words. */
+						120,		/* Stack depth in words. */
 						(void *) &ldrParams,		/* Pass the param pointer in the task parameter. */
 						2,			/* This task will run at priority X. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 100;
 
 		gpioParams.channel = GPIO_CHANNEL;
 		gpioParams.cmdCode = CMD_PB_PRESS;
@@ -679,10 +840,11 @@ int main( void )
 		gpioParams.lastValue = 0;
 		xTaskCreate(	vTaskGPIODebouncer,		/* Pointer to the function that implements the task. */
 						"PB Input",	/* Text name for the task.  This is to facilitate debugging only. */
-						240,		/* Stack depth in words. */
+						120,		/* Stack depth in words. */
 						(void *) &gpioParams,		/* Pass the param pointer in the task parameter. */
 						2,			/* This task will run at priority X. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 200;
 
 		pirParams.channel = PIR_CHANNEL;
 		pirParams.cmdCode = CMD_PIR_DATA;
@@ -690,10 +852,11 @@ int main( void )
 		pirParams.lastValue = 0;
 		xTaskCreate(	vTaskADCInput,		/* Pointer to the function that implements the task. */
 						"PIR Input",	/* Text name for the task.  This is to facilitate debugging only. */
-						240,		/* Stack depth in words. */
+						120,		/* Stack depth in words. */
 						(void *) &pirParams,		/* Pass the param pointer in the task parameter. */
 						2,			/* This task will run at priority X. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 300;
 
 		pirEdgeParams.channel = EDGE_THRESHOLD;
 		pirEdgeParams.cmdCode = CMD_OCC_EVENT;
@@ -701,10 +864,26 @@ int main( void )
 		pirEdgeParams.lastValue = 0;
 		xTaskCreate(	vTaskEdgeDetector,		/* Pointer to the function that implements the task. */
 						"PIR Edges",	/* Text name for the task.  This is to facilitate debugging only. */
-						240,		/* Stack depth in words. */
+						120,		/* Stack depth in words. */
 						(void *) &pirEdgeParams,		/* Pass the param pointer in the task parameter. */
 						2,			/* This task will run at priority X. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 400;
+
+		if (bmpeType != BMPE_NONE) {
+			// if there's no BMPE sensor, no need to measure anything there
+			bmpeParams.channel = BMPE_CHANNEL;
+			bmpeParams.cmdCode = CMD_BMPE_FIRST_EVENT;
+			bmpeParams.sampleRateMsec = BMPE_SAMPLE_RATE_MS;
+			bmpeParams.lastValue = 0;
+			xTaskCreate(	vTaskBMPEInput,		/* Pointer to the function that implements the task. */
+							"BMPE Sensors",	/* Text name for the task.  This is to facilitate debugging only. */
+							120,		/* Stack depth in words. */
+							(void *) &bmpeParams,		/* Pass the param pointer in the task parameter. */
+							2,			/* This task will run at priority X. */
+							NULL );		/* We are not using the task handle. */
+			initProgress = 500;
+		}
 
 #ifdef DACOUTPUT
 		xTaskCreate(	vTaskDACOutput,		/* Pointer to the function that implements the task. */
@@ -713,6 +892,7 @@ int main( void )
 						NULL,		/* We are not using the task parameter. */
 						1,			/* This task will run at priority Y. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 600;
 #endif
 
 		xTaskCreate(	vTaskDataConcentrator,		/* Pointer to the function that implements the task. */
@@ -721,24 +901,36 @@ int main( void )
 						NULL,		/* We are not using the task parameter. */
 						1,			/* This task will run at priority Z. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 700;
 
 		xTaskCreate(	vTaskLEDOutput,		/* Pointer to the function that implements the task. */
 						"LED Output",	/* Text name for the task.  This is to facilitate debugging only. */
-						240,		/* Stack depth in words. */
+						120,		/* Stack depth in words. */
 						NULL,		/* We are not using the task parameter. */
 						1,			/* This task will run at priority A. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 800;
 
 		xTaskCreate(	vTaskSimple7Output,		/* Pointer to the function that implements the task. */
 						"SSEG Output",	/* Text name for the task.  This is to facilitate debugging only. */
+						120,		/* Stack depth in words. */
+						NULL,		/* We are not using the task parameter. */
+						1,			/* This task will run at priority A. */
+						NULL );		/* We are not using the task handle. */
+		initProgress = 900;
+
+		xTaskCreate(	vTaskOLEDOutput,		/* Pointer to the function that implements the task. */
+						"OLED Output",	/* Text name for the task.  This is to facilitate debugging only. */
 						240,		/* Stack depth in words. */
 						NULL,		/* We are not using the task parameter. */
 						1,			/* This task will run at priority A. */
 						NULL );		/* We are not using the task handle. */
+		initProgress = 1000;
 
 
 		/* Start the scheduler so our tasks start executing. */
 		vTaskStartScheduler();
+		initProgress = 1100;
 
 	}
 
@@ -756,6 +948,7 @@ void vApplicationMallocFailedHook( void )
 {
 	/* This function will only be called if an API call to create a task, queue
 	or semaphore fails because there is too little heap RAM remaining. */
+	DBGOUTX("Allocation failed error, code=%d.\n", initProgress);
 	for( ;; );
 }
 /*-----------------------------------------------------------*/
@@ -765,6 +958,7 @@ void vApplicationStackOverflowHook( xTaskHandle *pxTask, signed char *pcTaskName
 	/* This function will only be called if a task overflows its stack.  Note
 	that stack overflow checking does slow down the context switch
 	implementation. */
+	DBGOUTX("Stack overflow error.\n");
 	for( ;; );
 }
 /*-----------------------------------------------------------*/
