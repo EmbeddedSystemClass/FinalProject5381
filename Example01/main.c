@@ -55,6 +55,7 @@
 
 //#define DACOUTPUT // uncomment this line to add support for DAC output for optional ADC testing
 #define TEST_SEQUENCES // uncomment this line to add support for sequence testing, such as the 7-segment display
+#define DBGPRINTF // uncomment this to have printouts for debugging
 
 #ifdef TEST_SEQUENCES
 #define TEST_7SEGMENTS
@@ -62,8 +63,51 @@
 
 #ifdef DBGPRINTF
 #define DBGOUTX printf
+// uncomment the following to get finer control of printout streams
+//#define DBGPRINTLDR
+//#define DBGPRINTADC
+//#define DBGPRINTPIR
+#define DBGPRINTBMPE
+//#define DBGPRINT7SEG
+//#define DBGPRINTALL
 #else
 #define DBGOUTX
+#endif
+
+#ifdef DBGPRINTLDR
+#define DBGOUTLDR DBGOUTX
+#else
+#define DBGOUTLDR
+#endif
+
+#ifdef DBGPRINTPIR
+#define DBGOUTXPIR DBGOUTX
+#else
+#define DBGOUTXPIR
+#endif
+
+#ifdef DBGPRINTBMPE
+#define DBGOUTXBMPE DBGOUTX
+#else
+#define DBGOUTXBMPE
+#endif
+
+#ifdef DBGPRINTADC
+#define DBGOUTXADC DBGOUTX
+#else
+#define DBGOUTXADC
+#endif
+
+#ifdef DBGPRINT7SEG
+#define DBGOUTX7SEG DBGOUTX
+#else
+#define DBGOUTX7SEG
+#endif
+
+#ifdef DBGPRINTALL
+#define DBGOUTXALL DBGOUTX
+#else
+#define DBGOUTXALL
 #endif
 
 /*-----------------------------------------------------------*/
@@ -295,7 +339,7 @@ void vTaskADCInput( void *pvParameters )
 	{
 		// read the current value of the ADC
 		int value = adc_read_single(params->channel);
-//		DBGOUTX("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
+		DBGOUTXADC("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
 
 		// only send values that are different from the last sample
 		if (params->lastValue != value)
@@ -409,7 +453,7 @@ void vTaskBMPEInput( void* pvParameters ) {
 		float humid = bmpe_readHumidity();
 		// create a 4-byte condensed code to detect drastic changes
 		int value = createBMPEChangeCode(temper, press, alt, humid); //adc_read_single(params->channel);
-//		DBGOUTX("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
+		DBGOUTXBMPE("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
 
 		// only send values that are different from the last sample
 		if (params->lastValue != value)
@@ -514,7 +558,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			//occupancy = 1; // version overriding sensor
 			pirReading = currentCmd.data;
 			pirmv = frac2MV(pirReading, ADC_MAX_INPUT);
-			DBGOUTX( "PIR=%d, mv=%d\n", pirReading, pirmv );
+			DBGOUTXPIR( "PIR=%d, mv=%d\n", pirReading, pirmv );
 			xQueueOverwrite(xEdgeDetectQueue, &pirReading);
 			break;
 		case CMD_OCC_EVENT:
@@ -522,7 +566,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			if (currentCmd.data != 0)
 				occ_motion_detected(); // generate the occupancy change if edge event (motion)
 			occupancy = getOccupancy();
-			DBGOUTX( "**   OCC=%d   **\n", occupancy );
+			DBGOUTXPIR( "**   OCC=%d   **\n", occupancy );
 			updated = TRUE;
 			break;
 		case CMD_PB_PRESS:
@@ -576,7 +620,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			// DEBUG: no separate task, just output immediately
 			/* Print out the name of this task and the current values read. */
 			ldrmv = frac2MV(ldrReading, ADC_MAX_INPUT);
-			DBGOUTX( "Data task: LDR reading=%d/4096, input (mv)=%d, ambient=%d, occup=%d, BRT=%d, MODE=%d, color=%d\n",
+			DBGOUTXALL( "Data task: LDR reading=%d/4096, input (mv)=%d, ambient=%d, occup=%d, BRT=%d, MODE=%d, color=%d\n",
 					ldrReading, ldrmv, ambient, occupancy, brightness, mode, bulbColor );
 		}
 
@@ -687,7 +731,7 @@ void vTaskSimple7Output( void *pvParameters )
 		// process data with output to onboard LED
 		if (data >= 0) {
 			s7_writeBinaryDP(data);
-			//DBGOUTX("7SEG = %d\n", data);
+			DBGOUTX7SEG("7SEG = %d\n", data);
 		}
 #ifdef TEST_7SEGMENTS
 		else {
@@ -745,7 +789,7 @@ void vTaskOLEDOutput( void* pvParameters ) {
 		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
 
 		// process data with output to OLED multiline display
-		DBGOUTX("Temperature(deg.C): %d\nPressure(hPa): %d\nHumidity(?): %d\nAltitude(m): %d\n",
+		DBGOUTXBMPE("Temperature(deg.C): %d\nPressure(hPa): %d\nHumidity(?): %d\nAltitude(m): %d\n",
 				data.temp, data.press, data.humid, data.altitude);
 	}
 }
@@ -797,10 +841,10 @@ int main( void )
 	bmpeType = bmpe_init();
 	switch (bmpeType) {
 	case BMPE_BMPTYPE:
-		DBGOUTX("Using BMP temperature/pressure sensor.\n");
+		DBGOUTXBMPE("Using BMP temperature/pressure sensor.\n");
 		break;
 	case BMPE_BMETYPE:
-		DBGOUTX("Using BMP temperature/pressure/humidity sensor.\n");
+		DBGOUTXBMPE("Using BMP temperature/pressure/humidity sensor.\n");
 		break;
 	}
 	initProgress = 1;
@@ -878,7 +922,7 @@ int main( void )
 			bmpeParams.lastValue = 0;
 			xTaskCreate(	vTaskBMPEInput,		/* Pointer to the function that implements the task. */
 							"BMPE Sensors",	/* Text name for the task.  This is to facilitate debugging only. */
-							120,		/* Stack depth in words. */
+							240,		/* Stack depth in words. */
 							(void *) &bmpeParams,		/* Pass the param pointer in the task parameter. */
 							2,			/* This task will run at priority X. */
 							NULL );		/* We are not using the task handle. */
