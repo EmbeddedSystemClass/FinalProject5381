@@ -42,7 +42,15 @@
   BSD license, all text above must be included in any redistribution
  ***************************************************************************/
 
-//#include "lpc17xx_gpio.h"
+#include "stdio.h" // for DBGOUT()
+//#define DEBUGOUT // uncomment this for debugging statements
+
+#ifdef DEBUGOUT
+#define DBGOUT printf
+#else
+#define DBGOUT
+#endif
+
 #include "math.h" // for pow() in readAltitude()
 
 #include "bmpe.h"
@@ -212,12 +220,13 @@
     int bmpe_init(void) {
       //_i2caddr = a;
     	_cs = 16; // code for P0.16 the master SSEL pin
+    	//_cs = 77; // code for P2.13 an alternate SSEL pin
     	_mosi = 18;
     	_miso = 17;
     	_sck = 15; // indicates SOFTWARE SPI mode (SLOW, TESTING ONLY!)
-    	//_sck = -1; // HARDWARE SPI mode
+    	_sck = -1; // HARDWARE SPI mode
 
-    	spi_init(); // this is required FIRST for LPC-1769 but NOT Arduino, and both SW and HW modes
+    	spi_init(_cs); // this is required FIRST for LPC-1769 but NOT Arduino, and both SW and HW modes
     	// from the Arduino docs for SPI.begin():
     	// "Initializes the SPI bus by setting SCK, MOSI, and SS to outputs, pulling SCK and MOSI low, and SS high."
     	// NOTE that is pulls SSEL high and the other outputs low.
@@ -238,7 +247,6 @@
 		}
 
       _chipID = read8(BME280_REGISTER_CHIPID);
-      _chipID = 0x58; // DEBUG OVERRIDE FOR TESTING ONLY!
       if (_chipID != 0x60 && _chipID != 0x58)
         return BMPE_NONE;
 
@@ -325,6 +333,7 @@
       digitalWrite(_cs, HIGH);
       if (_sck == -1)
     	  spi_endTransaction();              // release the SPI bus
+      DBGOUT("bmpeRd8(r%02x):%02x\n", reg, (int)(value & 0xFF));
       return value;
     }
 
@@ -346,6 +355,7 @@
       if (_sck == -1)
     	  spi_endTransaction();              // release the SPI bus
 
+      DBGOUT("bmpeRd16(r%02x):%02x/%02x\n", reg, (int)(value & 0xFF00)>>8, (int)(value & 0xFF));
       return value;
     }
 
@@ -398,6 +408,7 @@
       if (_sck == -1)
     	 spi_endTransaction();              // release the SPI bus
 
+      DBGOUT("bmpeRd24(r%02x):%02x/%02x/%02x\n", reg, (int)(value & 0xFF0000)>>16, (int)(value & 0xFF00)>>8, (int)(value & 0xFF));
       return value;
     }
 
@@ -434,7 +445,7 @@
     }
 
     /**************************************************************************/
-    /*!
+    /* returns value in degrees C
     */
     /**************************************************************************/
     float bmpe_readTemperature(void)
@@ -458,7 +469,7 @@
     }
 
     /**************************************************************************/
-    /*!
+    /* returns value in Pa (pascals); divide by 100.0 to get hPa (more common)
     */
     /**************************************************************************/
     float bmpe_readPressure(void) {
@@ -530,7 +541,7 @@
     */
     /**************************************************************************/
     // The seaLevel pressure used here is the standard for one atmosphere, in hPa.
-#define STD_ATMOSPHERE (1013.25F / 100.0F)
+#define STD_ATMOSPHERE (1013.25F)
     float seaLevel = STD_ATMOSPHERE; // TODO: create a method for calibrating this somehow
 
     void bmpe_setReferencePressure() {

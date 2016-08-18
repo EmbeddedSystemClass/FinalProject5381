@@ -62,8 +62,12 @@ Also, the functions specified in the LPCOpen periph_spi app should be consulted 
 static void getPortAndPin(int pincode, int* port, int* pin) {
 	// Arduino only uses first 32 pins, but 1769 has 64 pins that we can code
 	// So, for example, pincode=49 => port 3, pin 1 (0-based)
-	*port = pincode / 32; // integer division
-	*pin = pincode % 32;
+	*port = pincode >> 5;
+	*pin = pincode & 0x1F;
+}
+
+int getPinCode(int port, int pin) {
+	return port << 5 + pin;
 }
 
 // this is provided on Arduino for setting the FIODIR bits
@@ -80,9 +84,9 @@ void  spi_pinWrite(int pincode, int val)
 	int port, pin;
 	getPortAndPin(pincode, &port, &pin);
 	if (val)
-		GPIO_SetValue(port, pin);
+		FIO_SetValue(port, (1 << pin));
 	else
-		GPIO_ClearValue(port, pin);
+		FIO_ClearValue(port, (1 << pin));
 	return;
 }
 
@@ -98,7 +102,7 @@ int spi_pinRead(int pincode)
 // this structure controls the basic SPI operational settings (CPHA, CPOL, Mode, DataOrder, ClockRate/Hz)
 SPI_CFG_Type currentSettings;
 
-int spi_init() {
+int spi_init(int ssel) {
 	// set up defaults (MASTER mode)
 	SPI_ConfigStructInit(&currentSettings);
 	// enable clock/power to SPI
@@ -106,24 +110,63 @@ int spi_init() {
 	// configure pin select functions
 	// P0.15 is SCLK, P0.16 is SSEL, P0.17 is MISO, P0.18 is MOSI
 	PINSEL_CFG_Type pincfg;
+	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL; // same for all pins for now
+
 	pincfg.Portnum = PINSEL_PORT_0;
+	pincfg.Pinnum = PINSEL_PIN_17;
 	pincfg.Funcnum = PINSEL_FUNC_3; // SPI is func 3=0b11
 	pincfg.Pinmode = PINSEL_PINMODE_TRISTATE;
-	pincfg.OpenDrain = PINSEL_PINMODE_NORMAL;
+	PINSEL_ConfigPin(&pincfg);
 
-	pincfg.Pinnum = PINSEL_PIN_15;
-	PINSEL_ConfigPin(&pincfg);
-	pincfg.Pinnum = PINSEL_PIN_16;
-	PINSEL_ConfigPin(&pincfg);
-	pincfg.Pinnum = PINSEL_PIN_17;
-	PINSEL_ConfigPin(&pincfg);
+	pincfg.Portnum = PINSEL_PORT_0;
 	pincfg.Pinnum = PINSEL_PIN_18;
+	pincfg.Funcnum = PINSEL_FUNC_3; // SPI is func 3=0b11
+	pincfg.Pinmode = PINSEL_PINMODE_TRISTATE;
 	PINSEL_ConfigPin(&pincfg);
 
+	// SSEL operates as func.0 (GPIO) in master mode and needs a pull-up
+	// NOTE: use the func3 SSEL operation for SLAVE mode
+	int ssel_port, ssel_pin;
+	getPortAndPin(ssel, &ssel_port, &ssel_pin);
+	pincfg.Portnum = ssel_port;
+	pincfg.Pinnum = ssel_pin;
+	pincfg.Pinmode = PINSEL_PINMODE_PULLUP;
+	pincfg.Funcnum = PINSEL_FUNC_0; // GPIO is func 0=0b00
+	PINSEL_ConfigPin(&pincfg);
+
+	// clock also needs a pulldown line (see LPCOpen code board.c and spi_17xx_40xx.c)
+	pincfg.Portnum = PINSEL_PORT_0;
+	pincfg.Pinnum = PINSEL_PIN_15;
+	pincfg.Pinmode = PINSEL_PINMODE_PULLDOWN;
+	pincfg.Funcnum = PINSEL_FUNC_0; // GPIO is func 0=0b00
+	PINSEL_ConfigPin(&pincfg);
+
+	// NOTE: the BME280 chip auto-selects its SPI mode depending on the state of the SCK line when SSEL is set low
+	// From p.32 of the Bosch BME280 data sheet:
+	//  The automatic selection between mode ‘00’ and ‘11’ is determined by the value
+	//    of SCK after the CSB falling edge.
+	// So, with SCK set as input at this point, a pull-down resistor should set SCK low
+	//    which would seem to imply CPOL=CPHA=0 mode 0
+	// However, after operations, it might be left undetermined, so best to set it here
+	// Temporarily operate SCK in GPIO mode for this:
+	spi_pinMode(15,1);
+	spi_pinWrite(15,0);
 	// direction (input/output) should be specified
 	// and any output presets should be defined before that
 	// this is done in the Arduino code port
+	//int ssel = getPinCode(0, 16);
+	//int ssel = getPinCode(2, 13);
+	spi_pinWrite(ssel, 1); // ensure that SSEL starts HIGH from a powerup/input state
+	spi_pinMode(ssel, 1);
+	// then when we drop the SSEL line, with SCK=low, we should get mode 0 operation, as used in the Arduino code
+	spi_pinWrite(ssel, 0); // a zero output here locks in the SPI interface instead of I2C
+	spi_pinWrite(ssel, 1); // but operationally SPI SSEL is inactive only when HI(1)
 
+	// finally, configure SCK pin to run in SPI mode
+	pincfg.Pinnum = PINSEL_PIN_15;
+	pincfg.Pinmode = PINSEL_PINMODE_PULLDOWN;
+	pincfg.Funcnum = PINSEL_FUNC_3; // SPI is func 3=0b11
+	PINSEL_ConfigPin(&pincfg);
 	// and flush the data lines
 
 	return 0;
@@ -133,13 +176,14 @@ void *SPISettings(int clk, int msls, int mode) {
 	currentSettings.Mode = SPI_MASTER_MODE;
 	currentSettings.Databit = SPI_DATABIT_8;
 	currentSettings.ClockRate = clk;
-	currentSettings.DataOrder = msls? SPI_DATA_MSB_FIRST: SPI_DATA_LSB_FIRST;
+	currentSettings.DataOrder = msls? SPI_DATA_LSB_FIRST: SPI_DATA_MSB_FIRST;
 	currentSettings.CPHA = (mode & 0b001)? SPI_CPHA_SECOND: SPI_CPHA_FIRST;
-	currentSettings.CPOL = (mode & 0b010)? SPI_CPOL_LO: SPI_CPOL_HI;
+	currentSettings.CPOL = (mode & 0b010)? SPI_CPOL_HI: SPI_CPOL_LO;
 	return (void *) &currentSettings;
 }
 
 int spi_beginTransaction(void* params) {
+	// Arduino would disable shared interrupts here
 	SPI_Init(LPC_SPI, params);
 	return 0;
 }
@@ -178,5 +222,6 @@ uint8_t spi_transfer(uint8_t x) {
 }
 
 void spi_endTransaction(void) {
+	// Arduino would re-enable shared interrupts here
 	return;
 }

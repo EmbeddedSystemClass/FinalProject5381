@@ -20,7 +20,7 @@ extern void  spi_pinWrite(int pincode, int val); // GPIO pin write (any SSEL, in
 extern int  spi_pinRead(int pincode); // GPIO pin read
 extern void spi_pinMode(int pincode, int dir_in_is_zero); // set direction of GPIO pin
 
-extern int spi_init();
+extern int spi_init(int ssel_pincode);
 extern void *SPISettings(int clk, int msls, int mode);
 extern int spi_beginTransaction(void*);
 extern uint8_t spi_transfer(uint8_t x);

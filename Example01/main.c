@@ -67,8 +67,9 @@
 //#define DBGPRINTLDR
 //#define DBGPRINTADC
 //#define DBGPRINTPIR
-#define DBGPRINTBMPE
+//#define DBGPRINTBMPE
 //#define DBGPRINT7SEG
+#define DBGPRINTOLED
 //#define DBGPRINTALL
 #else
 #define DBGOUTX
@@ -102,6 +103,12 @@
 #define DBGOUTX7SEG DBGOUTX
 #else
 #define DBGOUTX7SEG
+#endif
+
+#ifdef DBGPRINTOLED
+#define DBGOUTXOLED DBGOUTX
+#else
+#define DBGOUTXOLED
 #endif
 
 #ifdef DBGPRINTALL
@@ -440,6 +447,18 @@ int createBMPEChangeCode(float temp, float press, float alt, float humid) {
 	return val++;
 }
 
+int encodeValue(float x, int scale) {
+	double temp = (double)scale;
+	temp *= x;
+	double val = (temp);
+	int j = (int)val;
+	return j;
+}
+
+float decodeValue(int x, int scale) {
+	return (float)x / (float)scale;
+}
+
 void vTaskBMPEInput( void* pvParameters ) {
 	SampleParams *params = (SampleParams *)pvParameters;
 
@@ -453,7 +472,7 @@ void vTaskBMPEInput( void* pvParameters ) {
 		float humid = bmpe_readHumidity();
 		// create a 4-byte condensed code to detect drastic changes
 		int value = createBMPEChangeCode(temper, press, alt, humid); //adc_read_single(params->channel);
-		DBGOUTXBMPE("DEBUG - ADC value %d for ch#%d\n", value, params->channel);
+		DBGOUTXBMPE("DEBUG - ADC value %d for ch#%d[T=%1.2f,P=%1.2f,A=%1.2f,H=%1.2f]\n", value, params->channel, temper, press, alt, humid);
 
 		// only send values that are different from the last sample
 		if (params->lastValue != value)
@@ -464,20 +483,20 @@ void vTaskBMPEInput( void* pvParameters ) {
 			// send the data commands to the command queue
 			Command command;
 			command.code = CMD_BMPE_TEMP_DATA;
-			command.data = temper;
+			command.data = encodeValue(temper, 100);
 			// send the data; by using 0 delay, we just drop data if the queue is full
 			xQueueSendToBack(xCommandQueue, &command, 0);
 			command.code = CMD_BMPE_PRESS_DATA;
-			command.data = press;
+			command.data = encodeValue(press, 100);
 			// send the data; by using 0 delay, we just drop data if the queue is full
 			xQueueSendToBack(xCommandQueue, &command, 0);
 			command.code = CMD_BMPE_HUMID_DATA;
-			command.data = humid;
+			command.data = encodeValue(humid, 100);
 			// send the data; by using 0 delay, we just drop data if the queue is full
 			xQueueSendToBack(xCommandQueue, &command, 0);
 			// NOTE: Make sure the last event sent (which triggers output) is NOT optional
 			command.code = CMD_BMPE_ALT_DATA;
-			command.data = alt;
+			command.data = encodeValue(alt, 100);
 			// send the data; by using 0 delay, we just drop data if the queue is full
 			xQueueSendToBack(xCommandQueue, &command, 0);
 		}
@@ -628,11 +647,11 @@ void vTaskDataConcentrator( void *pvParameters )
 			// if we have changes in relevant data, update the environment display (OLED)
 			// Now Showing: temperature, pressure, humidity, altitude (abs/rel)
 			DisplayResult resData;
-			resData.temp = temperatureReading;
-			resData.press = pressureReading;
-			resData.humid = humidityReading;
-			resData.altitude = altitudeReading;
-			//resData.refAlt = altitudeReference;
+			resData.temp = decodeValue(temperatureReading, 100);
+			resData.press = decodeValue(pressureReading, 100);
+			resData.humid = decodeValue(humidityReading, 100);
+			resData.altitude = decodeValue(altitudeReading, 100);
+			//resData.refAlt = decodeValue(altitudeReference, 100);
 			// send this data to the OLED output queue(s)
 			xQueueOverwrite(xDisplayQueue, &resData);
 		}
@@ -789,7 +808,7 @@ void vTaskOLEDOutput( void* pvParameters ) {
 		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
 
 		// process data with output to OLED multiline display
-		DBGOUTXBMPE("Temperature(deg.C): %d\nPressure(hPa): %d\nHumidity(?): %d\nAltitude(m): %d\n",
+		DBGOUTXOLED("Temperature(deg.C): %1.2f\nPressure(hPa): %1.2f\nHumidity(?): %1.2f\nAltitude(m): %1.2f\n",
 				data.temp, data.press, data.humid, data.altitude);
 	}
 }
@@ -812,7 +831,7 @@ SampleParams pirParams;
 SampleParams pirEdgeParams;
 
 #define BMPE_CHANNEL (0) // SPI channel 0 with SSEL0
-#define BMPE_SAMPLE_RATE_MS (5000)
+#define BMPE_SAMPLE_RATE_MS (2000)
 SampleParams bmpeParams;
 
 int bmpeType = BMPE_NONE; // global feature: what kind of environment sensor
@@ -841,10 +860,10 @@ int main( void )
 	bmpeType = bmpe_init();
 	switch (bmpeType) {
 	case BMPE_BMPTYPE:
-		DBGOUTXBMPE("Using BMP temperature/pressure sensor.\n");
+		DBGOUTX("Using BMP temperature/pressure sensor.\n");
 		break;
 	case BMPE_BMETYPE:
-		DBGOUTXBMPE("Using BMP temperature/pressure/humidity sensor.\n");
+		DBGOUTX("Using BMP temperature/pressure/humidity sensor.\n");
 		break;
 	}
 	initProgress = 1;

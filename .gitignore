@@ -20,3 +20,4 @@ latex
 out*.*
 .DS_Store
 ~*.*
+*.tdc
