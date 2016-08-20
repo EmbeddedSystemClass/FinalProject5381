@@ -5,6 +5,8 @@
  *      Author: Mike
  */
 
+//#include "lpc_types.h"
+#include "lpc17xx_pinsel.h"
 #include "lpc17xx_gpio.h"
 
 /*-----------------------------------------------------------*/
@@ -24,34 +26,94 @@
  * A simple font table is provided for standard hex display (0-15 map to decimal numbers and letters A-F).
  * An alternate font table is provided for testing.
  *
+ * UPDATE: An alternate wiring scheme is provided on Port 1 Pins 1.25-1.18. Motivation was that my port 2 functionality was broken during header soldering (perhaps).
+ *
+ * P2 WIRING TABLE:
+ * DP	P2.7	J2p42
+ * A	P2.6	J2p43
+ * B	P2.5	J2p44
+ * C	P2.4	J2p45
+ * D	P2.6	J2p46
+ * E	P2.2	J2p47
+ * F	P2.1	J2p48
+ * G	P2.0	J2p49
+ *
+ * P1 WIRING TABLE:
+ * DP	P1.25	PAD 11
+ * A	P2.24	PAD 17
+ * B	P2.23	PAD  6
+ * C	P2.22	PAD 12
+ * D	P2.21	PAD 18
+ * E	P2.20	PAD  7
+ * F	P2.19	PAD 13
+ * G	P2.18	PAD 19
+ * NOTE: Due to placement of the pads in a square array out of numerical order, the segment bits are adjacent as follows.
+ *
+ * Looking down from above at the board edge, we see:
+ * PAD1 (row by itself)
+ * PAD2 	PAD3 	PAD4 	PAD5 	PAD6/B 	PAD7/E
+ * PAD8 	PAD9 	PAD10	PAD11/.	PAD12/C	PAD13/F
+ * PAD14	PAD15	PAD16	PAD17/A	PAD18/D	PAD19/G
+ *
+ * Arrangements around the display are:
+ *
+ *
  * */
 typedef uint8_t CharBitPattern;
+
+//#define PORT2_WIRING // uncomment this line to use Port 2.7:0
+#define PORT1_WIRING // uncomment this line to use Port 1.25:18
+
+#ifdef PORT2_WIRING
+#define S7PORT (2)
+#define S7LSPIN (0)
+#else // PORT1_WIRING
+#define S7PORT (1)
+#define S7LSPIN (18)
+#endif
+#define S7MSPIN (S7LSPIN + 7)
 
 void s7_init() {
 
 	/*
-	 * For GPIO functions of Port 2.0-2.7, write repeating pattern 0b00 (0x0000) to the lower 16 bits of PINSEL4
-	 * For no pull-up or pull-down resistors, write repeating pattern 0b10 (0xAAAA) to the lower 16 bits of PINMODE4
-	 * For output directionality, set 0b1 to each of the lower 8 bits (0xFF) of FIO2DIR
+	 * Configure using the CMSIS library functions PINSEL_* and FIO_*
+	 * Configuration deals with Pinmode (the pullup/pulldown resistors), open drain, and functions 00-11
+	 * We will need GPIO (func.0) and no resistors or open drain pins.
+	 * In addition, we need to set the FIOMASK bits to 0 to allow output through the FIOPIN register,
+	 *   and the FIODIR bits to 1 to the output direction.
+	 *
 	 */
-	uint32_t temp;
-	// set 8 function pins to GPIO function
-	LPC_PINCON->PINSEL4 = ~0xFFFF; // 00 is GPIO function
-	// set 8 mode pins to have no pull-up or pull-down resistors
-	temp = LPC_PINCON->PINMODE4 &= ~0xFFFF; // input current register, masked to clear LSW (15:0)
-	LPC_PINCON->PINMODE4 = temp | 0xAAAA; // output by OR-ing with LSW 8 shifted 0b10 pairs into LSW (15:0)
-	// send 1's to lower byte of FIO2DIR to select port outputs
-	LPC_GPIO2->FIODIR0 = 0x00FF;
-	// output all zeroes to bottom byte of FIO2MASK to make sure outputs go out (default but reset any other usage)
-	LPC_GPIO2->FIOMASK0 = 0;
+
+	PINSEL_CFG_Type config;
+	config.OpenDrain = PINSEL_PINMODE_NORMAL;
+	config.Pinmode = PINSEL_PINMODE_TRISTATE;
+	config.Funcnum = PINSEL_FUNC_0; // GPIO
+	int port = S7PORT;
+	config.Portnum = port;
+	for (int i=0; i<8; ++i) {
+		int pin = S7LSPIN + i; // assumes pins are adjacent (for now)
+		// OPTIONAL: this can be scanned in from an array of pin codes (port * 32 + pin)
+		// so the file really can support any 8 GPIO pins for segment output.
+		config.Pinnum = pin;
+		PINSEL_ConfigPin(&config);
+		// set the output mask bit to 0 to allow outputs through
+		FIO_SetMask(port, (1<<pin), 0);
+		// set the direction bit to 1 for output
+		FIO_SetDir(port, (1<<pin), 1);
+	}
 }
 
 void s7_write(CharBitPattern raw_output) {
 
 	/* Use the FIOMASK register to ignore the upper 3 bytes and write to the lower.
-	 * Then just output the raw output directly.
+	 * Then just output the raw output directly, shifting over by the number of the LS pin.
+	 * This is done by writing directly to the FIOPIN register.
+	 *
+	 * NOTE: The CMSIS library does not seem to provide this functionality directly.
 	 */
-	LPC_GPIO2->FIOPIN0 = raw_output;
+	// currently this only supports ports 1 and 2; the CMSIS library has a static function supporting ports 0-4
+	LPC_GPIO_TypeDef * pGPIO = (S7PORT == 2) ? LPC_GPIO2 : LPC_GPIO1;
+	pGPIO->FIOPIN = (raw_output << S7LSPIN);
 }
 
 static CharBitPattern testFont[] = {
