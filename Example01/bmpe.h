@@ -24,7 +24,7 @@
     // give relative altitude to reference which starts as one standard atmosphere at standard temp
     // see https://en.wikipedia.org/wiki/Atmospheric_pressure
     extern float bmpe_readAltitude();
-    extern void bmpe_readReferencePressure();
+    extern void bmpe_setReferencePressure();
 
 
 #endif /* BMPE_H_ */

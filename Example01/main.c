@@ -592,6 +592,9 @@ void vTaskDataConcentrator( void *pvParameters )
 			if (currentCmd.data < 0)
 				break; // ignore button releases
 			mode = getNextMode(mode, 1); // 2nd param includes total shutoff for debug purposes
+			// button click: reset reference pressure to current value (show relative altitude to this value)
+			bmpe_setReferencePressure();
+			DBGOUTXOLED("Reset reference altitude/pressure.\n");
 			updated = TRUE;
 			break;
 		case CMD_BMPE_TEMP_DATA:
@@ -601,7 +604,7 @@ void vTaskDataConcentrator( void *pvParameters )
 			break;
 		case CMD_BMPE_PRESS_DATA:
 			// interpret the sensor values as appropriate (integer assumed to have N decimals
-			pressureReading = currentCmd.data;
+			pressureReading = currentCmd.data / 100.0F; // convert Pa to hPa (more conventional)
 			// intermediate data value - no update yet
 			break;
 		case CMD_BMPE_HUMID_DATA:
@@ -798,6 +801,9 @@ void vTaskSimple7Output( void *pvParameters )
 /*-----------------------------------------------------------*/
 //	TASK - OLED DISPLAY (I2C) OUTPUT DRIVER
 /*-----------------------------------------------------------*/
+#define FAHR(c) ((float)(1.8F * (c) + 32.0F))
+#define INHG(hp) ((float)((hp) / 33.863752577878))
+#define METERS2FEET(m) ((float)((m) * 3.28084))
 void vTaskOLEDOutput( void* pvParameters ) {
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
@@ -808,8 +814,8 @@ void vTaskOLEDOutput( void* pvParameters ) {
 		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
 
 		// process data with output to OLED multiline display
-		DBGOUTXOLED("Temperature(deg.C): %1.2f\nPressure(hPa): %1.2f\nHumidity(?): %1.2f\nAltitude(m): %1.2f\n",
-				data.temp, data.press, data.humid, data.altitude);
+		DBGOUTXOLED("Temperature(deg.F): %1.2f, (deg.C): %1.2f\nPressure(inHg): %1.2f, (hPa): %1.2f\nHumidity(%%): %1.2f\nRel.Altitude Since Reset(ft): %1.2f, (m): %1.2f\n\n",
+				FAHR(data.temp), data.temp, INHG(data.press), data.press, data.humid, METERS2FEET(data.altitude), data.altitude);
 	}
 }
 
@@ -866,6 +872,8 @@ int main( void )
 		DBGOUTX("Using BMP temperature/pressure/humidity sensor.\n");
 		break;
 	}
+	// startup: set reference pressure to current value (show relative altitude to that of startup)
+	bmpe_setReferencePressure();
 	initProgress = 1;
 
 	// set up the command and data queues
