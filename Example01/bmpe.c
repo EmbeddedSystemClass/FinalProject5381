@@ -16,6 +16,8 @@
  *  It figures out at runtime if it is being asked to connect to a BMP or BME and acts accordingly.
  *  (Humidity functions on the BMP only return 0.)
  *
+ *  Added a method to set the sea-level (reference) pressure to allow relative altitude calculations.
+ *
  */
 
 /***************************************************************************
@@ -220,10 +222,10 @@
     int bmpe_init(void) {
       //_i2caddr = a;
     	_cs = 16; // code for P0.16 the master SSEL pin
-    	//_cs = 77; // code for P2.13 an alternate SSEL pin
+    	//_cs = 77; // code for P2.13 an alternate SSEL pin (2*32+13 = 77)
     	_mosi = 18;
     	_miso = 17;
-    	_sck = 15; // indicates SOFTWARE SPI mode (SLOW, TESTING ONLY!)
+    	_sck = 15; // indicates SOFTWARE SPI mode (BIT BANGING, SLOW, TESTING ONLY!)
     	_sck = -1; // HARDWARE SPI mode
 
     	spi_init(_cs); // this is required FIRST for LPC-1769 but NOT Arduino, and both SW and HW modes
@@ -542,7 +544,7 @@
     /**************************************************************************/
     // The seaLevel pressure used here is the standard for one atmosphere, in hPa.
 #define STD_ATMOSPHERE (1013.25F)
-    float seaLevel = STD_ATMOSPHERE; // TODO: create a method for calibrating this somehow
+    float seaLevel = STD_ATMOSPHERE;
 
     void bmpe_setReferencePressure() {
     	seaLevel = bmpe_readPressure() / 100.0F;
