@@ -448,6 +448,7 @@ int createBMPEChangeCode(float temp, float press, float alt, float humid) {
 }
 
 int encodeValue(float x, int scale) {
+	// encodes a float value as an int with N decimals by multiplying by a constant scale factor, e.g., 100 (2 DP) or 1000 (3 DP)
 	double temp = (double)scale;
 	temp *= x;
 	double val = (temp);
@@ -456,6 +457,8 @@ int encodeValue(float x, int scale) {
 }
 
 float decodeValue(int x, int scale) {
+	// turns an integer-encoded value back into a float, using scale factor for number of decimals coded
+	// NOTE: scale factor for encode SHOULD match that of decode if you want to get the same value back
 	return (float)x / (float)scale;
 }
 

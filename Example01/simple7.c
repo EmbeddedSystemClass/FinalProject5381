@@ -25,6 +25,9 @@
  *
  * A simple font table is provided for standard hex display (0-15 map to decimal numbers and letters A-F).
  * An alternate font table is provided for testing.
+ * An ASCII function will display the letters from the hex font using their given ASCII codes instead of binary values. Both upper and lower case are supported. Unknowns are shown as blank/space.
+ *
+ * NOTE: This could be enhanced to drive multiple segments, but my needs for this project were very simple.
  *
  * UPDATE: An alternate wiring scheme is provided on Port 1 Pins 1.25-1.18. Motivation was that my port 2 functionality was broken during header soldering (perhaps).
  *
