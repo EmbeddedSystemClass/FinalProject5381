@@ -21,10 +21,10 @@ This procedure is how I got things downloaded from Github on Windows 10 on my Su
 
 4. Remove the preceding folders and their contents in their entirety (trust me!):
 
-	rmdir -f C*
-	rmdir -f E*
-	rmdir -f F*
-	rmdir -f lpc*
+	rm -rf C*
+	rm -rf E*
+	rm -rf F*
+	rm -rf lpc*
 
 5. Open the IDE to this folder as a workspace (it will create a .metadata folder if needed).
 
