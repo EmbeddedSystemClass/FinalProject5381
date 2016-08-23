@@ -595,8 +595,9 @@ void vTaskDataConcentrator( void *pvParameters )
 			if (currentCmd.data < 0)
 				break; // ignore button releases
 			mode = getNextMode(mode, 1); // 2nd param includes total shutoff for debug purposes
-			// button click: reset reference pressure to current value (show relative altitude to this value)
-			bmpe_setReferencePressure();
+			// button click: if we have a pressure sensor, reset reference pressure to current value (show relative altitude w. this value)
+			if (bmpeType != BMPE_NONE)
+				bmpe_setReferencePressure();
 			DBGOUTXOLED("Reset reference altitude/pressure.\n");
 			updated = TRUE;
 			break;
@@ -876,7 +877,8 @@ int main( void )
 		break;
 	}
 	// startup: set reference pressure to current value (show relative altitude to that of startup)
-	bmpe_setReferencePressure();
+	if (bmpeType != BMPE_NONE)
+		bmpe_setReferencePressure();
 	initProgress = 1;
 
 	// set up the command and data queues
@@ -977,6 +979,7 @@ int main( void )
 						NULL );		/* We are not using the task handle. */
 		initProgress = 700;
 
+		/* Create output tasks. */
 		xTaskCreate(	vTaskLEDOutput,		/* Pointer to the function that implements the task. */
 						"LED Output",	/* Text name for the task.  This is to facilitate debugging only. */
 						120,		/* Stack depth in words. */
@@ -986,7 +989,7 @@ int main( void )
 		initProgress = 800;
 
 		xTaskCreate(	vTaskSimple7Output,		/* Pointer to the function that implements the task. */
-						"SSEG Output",	/* Text name for the task.  This is to facilitate debugging only. */
+						"7SEG Output",	/* Text name for the task.  This is to facilitate debugging only. */
 						120,		/* Stack depth in words. */
 						NULL,		/* We are not using the task parameter. */
 						1,			/* This task will run at priority A. */
