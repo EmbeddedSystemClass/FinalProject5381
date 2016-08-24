@@ -64,8 +64,8 @@
  * */
 typedef uint8_t CharBitPattern;
 
-//#define PORT2_WIRING // uncomment this line to use Port 2.7:0
-#define PORT1_WIRING // uncomment this line to use Port 1.25:18
+#define PORT2_WIRING // uncomment this line to use Port 2.7:0
+//#define PORT1_WIRING // uncomment this line to use Port 1.25:18
 
 #ifdef PORT2_WIRING
 #define S7PORT (2)

@@ -117,6 +117,8 @@
 #define DBGOUTXALL
 #endif
 
+int bmpeType = BMPE_NONE; // global feature: what kind of environment sensor
+
 /*-----------------------------------------------------------*/
 //  APP OPERATION MODES (PB SELECTABLE STATE TRANSITIONS)
 /*-----------------------------------------------------------*/
@@ -844,7 +846,6 @@ SampleParams pirEdgeParams;
 #define BMPE_SAMPLE_RATE_MS (2000)
 SampleParams bmpeParams;
 
-int bmpeType = BMPE_NONE; // global feature: what kind of environment sensor
 int initProgress = 0; // debug code
 
 int main( void )
