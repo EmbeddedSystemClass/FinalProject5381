@@ -66,7 +66,7 @@
 // uncomment the following to get finer control of printout streams
 //#define DBGPRINTLDR
 //#define DBGPRINTADC
-//#define DBGPRINTPIR
+#define DBGPRINTPIR
 //#define DBGPRINTBMPE
 //#define DBGPRINT7SEG
 #define DBGPRINTOLED
@@ -976,7 +976,7 @@ int main( void )
 						"Data Concentrator",	/* Text name for the task.  This is to facilitate debugging only. */
 						240,		/* Stack depth in words. */
 						NULL,		/* We are not using the task parameter. */
-						1,			/* This task will run at priority Z. */
+						3,			/* This task will run at priority Z. */
 						NULL );		/* We are not using the task handle. */
 		initProgress = 700;
 
