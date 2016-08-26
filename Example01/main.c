@@ -881,6 +881,8 @@ int main( void )
 	if (bmpeType != BMPE_NONE)
 		bmpe_setReferencePressure();
 	initProgress = 1;
+	extern void extra_tests();
+	extra_tests();
 
 	// set up the command and data queues
 	xCommandQueue = xQueueCreate( COMMAND_QUEUE_LENGTH, COMMAND_QUEUE_SIZE );
@@ -1050,4 +1052,103 @@ void vApplicationIdleHook( void )
 void vApplicationTickHook( void )
 {
 	/* This example does not use the tick hook to perform any processing. */
+}
+
+//??#include "stdlib.h" // for min() and max()??
+#undef min
+#define min(a,b) ((a)<(b)?(a):(b))
+#undef max
+#define max(a,b) ((a)>(b)?(a):(b))
+
+void extra_tests() {
+#if 0
+	// get the system to generate and print a table of ADC values vs. brightness settings
+	// Use this for the homework presentation, then comment it out.
+	//printf("==============\n");
+	printf("TABLE OF %d ADC VALUES TRANSLATED TO %d BRIGHTNESS LEVELS\n", ADC_MAX_INPUT+1, BRIGHTNESS_MAX+1);
+	//printf("==============\n");
+	printf("Inp.Min\tInp.Max\tFraction\t%%Scale\tOutput\tOut.Chg.\n"); // CSV/TSV
+	//printf("\tInput\t\t%%Scale\t\tOutput\n"); // ASCII ART
+	int ambOld = -1;
+	int chunk = 128;
+	int delta = 0;
+	for (int i=0, line=0; i<=ADC_MAX_INPUT; i+=chunk, ++line) {
+//		int every = 8;
+//		if ((0) == (line % every)) {
+//			printf("-----\n"); // generate some regular dividers periodically
+//		}
+
+		// When delta occurs, line = 0,2,6,10,14,18,
+		int del = ADC_MAX_INPUT / BRIGHTNESS_MAX; // 512
+		int offset = del/2; //256
+		int chk = del/4; // 128
+		int rangeMin = max(0, line * chk);
+		int rangeMax = min(ADC_MAX_INPUT, rangeMin + del - 1);
+
+		int amb = getAmbientLightingLevel(i);
+		if (ambOld != amb || i == ADC_MAX_INPUT) {
+			delta = 1; // generate some indicator on change of value
+			ambOld = amb;
+		}
+		if (delta)
+			printf(
+					"%d\t%d\t%d/32\t%1.2f\t%d\t%s\n" // CSV/TSV version
+					//"%2d.\t%8d\t%8.2f\t%8d\t%s\n" // ASCII ART version
+					,
+					rangeMin,
+					rangeMax,
+					line,
+					(100.0F * i / (float)ADC_MAX_INPUT),
+					amb,
+					""//(delta? "<DELTA-": "")
+					);
+		delta = 0; // clear delta until next usage
+	}
+	printf("--END TABLE---\n"); // generate some regular dividers periodically
+/*
+TABLE OF 4097 ADC VALUES TRANSLATED TO 9 BRIGHTNESS LEVELS
+	Input	%Scale	Output	Out.Chg.
+-----
+1	0	0.00	8	<DELTA-
+2	128	3.12	8
+3	256	6.25	7	<DELTA-
+4	384	9.37	7
+5	512	12.50	7
+6	640	15.62	7
+7	768	18.75	6	<DELTA-
+8	896	21.87	6
+-----
+9	1024	25.00	6
+10	1152	28.12	6
+11	1280	31.25	5	<DELTA-
+12	1408	34.37	5
+13	1536	37.50	5
+14	1664	40.62	5
+15	1792	43.75	4	<DELTA-
+16	1920	46.87	4
+-----
+17	2048	50.00	4
+18	2176	53.12	4
+19	2304	56.25	3	<DELTA-
+20	2432	59.37	3
+21	2560	62.50	3
+22	2688	65.62	3
+23	2816	68.75	2	<DELTA-
+24	2944	71.87	2
+-----
+25	3072	75.00	2
+26	3200	78.12	2
+27	3328	81.25	1	<DELTA-
+28	3456	84.37	1
+29	3584	87.50	1
+30	3712	90.62	1
+31	3840	93.75	0	<DELTA-
+32	3968	96.87	0
+-----
+33	4096	100.00	0
+--END TABLE---
+
+*/
+#endif
+	return;
 }
