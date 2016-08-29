@@ -66,7 +66,7 @@
 // uncomment the following to get finer control of printout streams
 //#define DBGPRINTLDR
 //#define DBGPRINTADC
-#define DBGPRINTPIR
+//#define DBGPRINTPIR
 //#define DBGPRINTBMPE
 //#define DBGPRINT7SEG
 #define DBGPRINTOLED
@@ -559,6 +559,10 @@ void vTaskDataConcentrator( void *pvParameters )
 	int pressureReading = 0; // from the BMPE sensor
 	int altitudeReading = 0; // from the BMPE sensor
 	int humidityReading = 0; // from the BMPE sensor
+	enum { DATA7_AMBICODE, DATA7_PIR };
+	int data7Select = DATA7_AMBICODE; // select output data to the 7SEG display
+	enum { DATAO_ENVIRONMENTAL };
+	int dataOLEDSelect = DATAO_ENVIRONMENTAL; // select output data to the OLED display
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 	for( ;; )
@@ -636,14 +640,20 @@ void vTaskDataConcentrator( void *pvParameters )
 			brightness = getSmartBulbState( ambient, occupancy );
 			// once the brightness level is known, we can set the on-board LED color with the current mode
 			int bulbColor = selectBulbColor(brightness, mode);
-			// send this data to the LED output queue(s)
+			// send the data to the LED output queue(s)
 			xQueueOverwrite(xBulbQueue, &bulbColor); // LED gets smart bulb output level
 
 			// process the conditions (ambient lighting, room occupancy) into proper output for the 7SEG display
 			extern int getAmbientDisplayCode(int ambient, int occupancy, int mode);
 			int codedAmbient = getAmbientDisplayCode(ambient, occupancy, mode);
-			// send this data to the 7SEG output queue
-			xQueueOverwrite(xSimple7Queue, &codedAmbient);
+			int dataTo7 = codedAmbient;
+			if (data7Select == DATA7_PIR) {
+				// ALT: send data from PIR sensor, scaled to fit 0-F display range
+				dataTo7 = adcScale(pirReading, 0, ADC_MAX_INPUT, 0, 0x0F);
+				dataTo7 = getAmbientDisplayCode(dataTo7, occupancy, mode); // show DP for final OCC reading
+			}
+			// send the data to the 7SEG output queue
+			xQueueOverwrite(xSimple7Queue, &dataTo7);
 
 			// DEBUG: no separate task, just output immediately
 			/* Print out the name of this task and the current values read. */
@@ -843,7 +853,7 @@ SampleParams pirParams;
 SampleParams pirEdgeParams;
 
 #define BMPE_CHANNEL (0) // SPI channel 0 with SSEL0
-#define BMPE_SAMPLE_RATE_MS (2000)
+#define BMPE_SAMPLE_RATE_MS (13000)
 SampleParams bmpeParams;
 
 int initProgress = 0; // debug code
