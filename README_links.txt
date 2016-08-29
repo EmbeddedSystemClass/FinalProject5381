@@ -17,3 +17,8 @@ Driver code (ref.implementation): https://github.com/BoschSensortec/BMP280_drive
 Driver code (ref.implementation): https://github.com/BoschSensortec/BME280_driver
 =====
 Links for AdaFruit Industries projects:
+-----
+PIR Motion Sensor: https://learn.adafruit.com/pir-passive-infrared-proximity-motion-sensor/
+BMP280 Sensor (Temp/Press): https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/
+BME280 Sensor (Temp/Press/Humid): https://learn.adafruit.com/adafruit-bme280-humidity-barometric-pressure-temperature-sensor-breakout/
+Small Mono OLED Displays: https://learn.adafruit.com/monochrome-oled-breakouts/
