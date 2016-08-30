@@ -46,6 +46,7 @@
 
 #include "stdio.h" // for DBGOUT()
 //#define DEBUGOUT // uncomment this for debugging statements
+//#define DOUBLE_PRECISION // uncomment this for full-precision reference compensation (direct from data sheet)
 
 #ifdef DEBUGOUT
 #define DBGOUT printf
@@ -267,7 +268,7 @@
     	  // OLD WAY OF "FORCED MODE"; I was actually using oversampled NORMAL mode w/o the filtering
     	  if (bmpe_hasHumidity())
     		  write8(BME280_REGISTER_CONTROLHUMID, 0x01); // Humid sampling @ 1x -- old code would use reset value of SKIP/0, sets 20-bit data to MSBIT (0x80000)
-		  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
+		  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (fast Tstandby, no filter, no 3-wire SPI)
 		  write8(BMP280_REGISTER_CONTROL, 0x3F); // 001 111 11b Temp.1x, Press.16x, NORMAL mode (oops!)
       } else if (forcedMode == FORCED) {
 		  // BMP: Forced mode xfers (one at a time, no filter)
@@ -282,13 +283,13 @@
     	  /*
     	   * NOTE: For usage in delta-height feature, we want lowest noise and highest accuracy. No need to oversample humidity, tho, it doesn't get noisy.
     	   * According to the datasheet Sec 3.5.3 (p.18 and Table 9), we want the following settings in CONTROL and CONFIG registers
+    	   * 	CONTROL.7:5 (3b) = 010 (2 << 5)		Temperature 2x oversampling [0=SKIP, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x, 6+=reserved]
+    	   * 	CONTROL.4:2 (3b) = 101 (5 << 2)		Pressure 16x oversampling [ same meaning as Temperature ]
     	   * 	CONTROL.1:0 (2b) =  11 (3 << 0)		Normal mode [0 is sleep, 1/2 is forced, 3 is normal]
-    	   * 	CONTROL.4:2 (3b) = 101 (5 << 2)		Pressure 16x oversampling [0=SKIP, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x, 6+=reserved]
-    	   * 	CONTROL.7:5 (3b) = 010 (2 << 5)		Temperature 2x oversampling [ same meaning as Pressure ]
-    	   * 	CTROL_H.2:0 (3b) = 001 (1 << 0)		Humidity 1x oversampling [ same meaning as Pressure ]
-    	   * 	CONFIG.1:0 (2b)  =  00 (0 << 0)		Use 3-wire SPI OFF [1=ON, 2,3 are reserved - DO NOT USE]
-    	   * 	CONFIG.4:2 (3b)  = 100 (4 << 2)		Filter ON using 16 coeffs [0=OFF, 1=2, 2=4, 3=8, 4=16, 5+=reserved]
+    	   * 	CTROL_H.2:0 (3b) = 001 (1 << 0)		Humidity 1x oversampling [ same meaning as Temperature ]
     	   * 	CONFIG.7:5 (3b)  = 000 (0 << 5)		Tstandby = 0.5ms (fastest) [0=0.5msec, 1=62.5, 2=125, 3=250, 4=500, 5=1000, 6=2000(P)/10(E), 7=4000(P)/20(E)]
+    	   * 	CONFIG.4:2 (3b)  = 100 (4 << 2)		Filter ON using 16 coeffs [0=OFF, 1=2, 2=4, 3=8, 4=16, 5+=reserved]
+    	   * 	CONFIG.1:0 (2b)  =  00 (0 << 0)		Use 3-wire SPI OFF [1=ON, 2,3 are reserved - DO NOT USE]
     	   * NOTE: This mode will also require Burst Mode Reads to avoid the problem solved by the Shadow Registers (see DS 4.1 p.21)
     	   */
 		  //Set before CONTROL_meas (DS 5.4.3)
@@ -296,7 +297,7 @@
     	  regValue = (1 << 0); // humid 1x sampling
     	  if (bmpe_hasHumidity())
     		  write8(BME280_REGISTER_CONTROLHUMID, regValue);
-		  regValue = (0x0 << 5) + (0x4 << 2) + (0x0 << 0); //000(Tsb) 100(F) 00(3W) -> 0x10// max.filtering and fastest sampling/lowest Tstandby, no 3-wire SPI
+		  regValue = (0x0 << 5) + (0x4 << 2) + (0x0 << 0); //000(Tsb) 100(F) 00(3W) -> 0x10// fastest sampling/lowest Tstandby, max.filtering, no 3-wire SPI
 		  write8(BME280_REGISTER_CONFIG, regValue);
 		  regValue = (0x2 << 5) + (0x5 << 2) + (0x3 << 0); //010(T) 101(P) 11(M) -> 0x57// 16x oversampling Press, 2x ovs.on Temp, normal mode
 		  write8(BME280_REGISTER_CONTROL, regValue);
@@ -561,6 +562,7 @@
     /* returns value in degrees C (0.01 deg.C precision)
     */
     /**************************************************************************/
+#ifndef DOUBLE_PRECISION
     static float compensateTemperature(int32_t adc_T)
     {
       int32_t var1, var2;
@@ -579,6 +581,29 @@
       float T  = (t_fine * 5 + 128) >> 8;
       return T/100;
     }
+#else
+    /*
+     * Double-precision Reference version from Bosch data sheet Appendix A.
+     */
+	typedef uint32_t BME280_S32_t;
+	// Returns temperature in DegC, double precision. Output value of “51.23” equals 51.23 DegC.
+	// t_fineX carries fine temperature as global value
+	BME280_S32_t t_fineX;
+	static double BME280_compensate_T_double(BME280_S32_t adc_T)
+	{
+		BME280_S32_t dig_T1 = _bme280_calib.dig_T1;
+		BME280_S32_t dig_T2 = _bme280_calib.dig_T2;
+		BME280_S32_t dig_T3 = _bme280_calib.dig_T3;
+		double var1, var2, T;
+		var1 = (((double)adc_T)/16384.0 - ((double)dig_T1)/1024.0) * ((double)dig_T2);
+		var2 = ((((double)adc_T)/131072.0 - ((double)dig_T1)/8192.0) *
+				(((double)adc_T)/131072.0 - ((double) dig_T1)/8192.0)) * ((double)dig_T3);
+		t_fineX = (BME280_S32_t)(var1 + var2);
+		T = (var1 + var2) / 5120.0;
+		return T;
+	}
+	/* END D.P.REF.COMPENSATION TEMPERATURE IMPLEMENTATION */
+#endif
 
     float bmpe_readTemperature(void)
     {
@@ -586,13 +611,18 @@
 
       int32_t adc_T;
       readBurst(BME280_REGISTER_TEMPDATA, 3, &adc_T, NULL, NULL);
+#ifndef DOUBLE_PRECISION
       return compensateTemperature(adc_T);
+#else
+      return (float)BME280_compensate_T_double(adc_T);
+#endif
     }
 
     /**************************************************************************/
     /* returns value in Pa (pascals); must divide by 100.0 to get hPa (more common)
     */
     /**************************************************************************/
+#ifndef DOUBLE_PRECISION
     static float compensatePressure(int32_t adc_P) {
       int64_t var1, var2, p;
 
@@ -617,15 +647,57 @@
       p = ((p + var1 + var2) >> 8) + (((int64_t)_bme280_calib.dig_P7)<<4);
       return (float)p/256;
     }
+#else
+    /*
+     * Double-precision Reference version from Bosch data sheet Appendix A.
+     */
+    // Returns pressure in Pa as double. Output value of “96386.2” equals 96386.2 Pa = 963.862 hPa
+    static double BME280_compensate_P_double(BME280_S32_t adc_P)
+    {
+    	BME280_S32_t dig_P1 = _bme280_calib.dig_P1;
+    	BME280_S32_t dig_P2 = _bme280_calib.dig_P2;
+    	BME280_S32_t dig_P3 = _bme280_calib.dig_P3;
+    	BME280_S32_t dig_P4 = _bme280_calib.dig_P4;
+    	BME280_S32_t dig_P5 = _bme280_calib.dig_P5;
+    	BME280_S32_t dig_P6 = _bme280_calib.dig_P6;
+    	BME280_S32_t dig_P7 = _bme280_calib.dig_P7;
+    	BME280_S32_t dig_P8 = _bme280_calib.dig_P8;
+    	BME280_S32_t dig_P9 = _bme280_calib.dig_P9;
+    	double var1, var2, p;
+    	var1 = ((double)t_fineX/2.0) - 64000.0;
+    	var2 = var1 * var1 * ((double)dig_P6) / 32768.0;
+    	var2 = var2 + var1 * ((double)dig_P5) * 2.0;
+    	var2 = (var2/4.0)+(((double)dig_P4) * 65536.0);
+    	var1 = (((double)dig_P3) * var1 * var1 / 524288.0 + ((double)dig_P2) * var1) / 524288.0;
+    	var1 = (1.0 + var1 / 32768.0)*((double)dig_P1);
+    	if (var1 == 0.0)
+    	{
+    		return 0; // avoid exception caused by division by zero
+    	}
+    	p = 1048576.0 - (double)adc_P;
+    	p = (p - (var2 / 4096.0)) * 6250.0 / var1;
+    	var1 = ((double)dig_P9) * p * p / 2147483648.0;
+    	var2 = p * ((double)dig_P8) / 32768.0;
+    	p = p + (var1 + var2 + ((double)dig_P7)) / 16.0;
+    	return p;
+    }
+	/* END D.P.REF.COMPENSATION PRESSURE IMPLEMENTATION */
+#endif
 
     float bmpe_readPressure(void) {
       int32_t adc_T, adc_P;
 
       readBurst(BME280_REGISTER_TEMPDATA, 6, &adc_T, &adc_P, NULL);
 
+#ifndef DOUBLE_PRECISION
       compensateTemperature(adc_T); // must be done first to get t_fine
 
       return compensatePressure(adc_P);
+#else
+      BME280_compensate_T_double(adc_T); // must be done first to get t_fine
+
+      return (float)BME280_compensate_P_double(adc_P);
+#endif
     }
 
 
@@ -633,6 +705,7 @@
     /* HUMIDITY - read singly as 2-byte 'burst'
     */
     /**************************************************************************/
+#ifndef DOUBLE_PRECISION
     static float compensateHumidity(int32_t adc_H) {
 
       int32_t v_x1_u32r;
@@ -653,6 +726,33 @@
       float h = (v_x1_u32r>>12);
       return  h / 1024.0;
     }
+#else
+    /*
+     * Double-precision Reference version from Bosch data sheet Appendix A.
+     */
+    // Returns humidity in %rH as as double. Output value of “46.332” represents 46.332 %rH
+    static double BME280_compensate_H_double(BME280_S32_t adc_H)
+    {
+    	BME280_S32_t dig_H1 = _bme280_calib.dig_H1;
+    	BME280_S32_t dig_H2 = _bme280_calib.dig_H2;
+    	BME280_S32_t dig_H3 = _bme280_calib.dig_H3;
+    	BME280_S32_t dig_H4 = _bme280_calib.dig_H4;
+    	BME280_S32_t dig_H5 = _bme280_calib.dig_H5;
+    	BME280_S32_t dig_H6 = _bme280_calib.dig_H6;
+    	double var_H;
+    	var_H = (((double)t_fineX) - 76800.0);
+    	var_H = (adc_H - (((double)dig_H4) * 64.0 + ((double)dig_H5) / 16384.0 * var_H)) *
+			(((double)dig_H2) / 65536.0 * (1.0 + ((double)dig_H6) / 67108864.0 * var_H *
+			(1.0 + ((double)dig_H3) / 67108864.0 * var_H)));
+    	var_H = var_H * (1.0 - ((double)dig_H1) * var_H / 524288.0);
+    	if (var_H > 100.0)
+    		var_H = 100.0;
+    	else if (var_H < 0.0)
+    		var_H = 0.0;
+    	return var_H;
+    }
+	/* END D.P.REF.COMPENSATION HUMIDITY IMPLEMENTATION */
+#endif
 
     float bmpe_readHumidity(void) {
 
@@ -664,9 +764,15 @@
 
         readBurst(BME280_REGISTER_TEMPDATA, 8, &adc_T, NULL, &adc_H);
 
+#ifndef DOUBLE_PRECISION
         compensateTemperature(adc_T); // must be done first to get t_fine
 
         return compensateHumidity(adc_H);
+#else
+        BME280_compensate_T_double(adc_T); // must be done first to get t_fine
+
+        return (float)BME280_compensate_H_double(adc_H);
+#endif
     }
 
     /**************************************************************************/
@@ -694,12 +800,14 @@
     	double diff = 1.0 - temp;
     	double value = 44330.0 * diff;
 
-      return value;
+      return (float)value;
     }
 
     void bmpe_setReferencePressure() {
-    	// override the standard pressure with the current reading in Pa
-    	seaLevel = bmpe_readPressure();
+    	// override the standard sea level pressure with the current reading in Pa
+    	bmpe_readAllSensors(NULL, &seaLevel, NULL, NULL);
+    	double temp = calcAltitude(seaLevel, seaLevel);
+    	DBGOUT("Ref.Pressure = %1.5f Pa (%1.5f m)", seaLevel, temp);
     }
 
     float bmpe_readAltitude()
@@ -717,12 +825,24 @@
     	int32_t adc_T, adc_P, adc_H;
     	int length = (bmpe_hasHumidity()? 8: 6);
     	readBurst(BME280_REGISTER_TEMPDATA, length, &adc_T, &adc_P, &adc_H);
-    	*pfTemp = compensateTemperature(adc_T); // must be done 1st to set t_fine
+    	float humid = 0.0;
+#ifndef DOUBLE_PRECISION
+    	float temp = compensateTemperature(adc_T); // must be done 1st to set t_fineX
     	float press = compensatePressure(adc_P);
-    	*pfPress = press;
-    	*pfAlt = calcAltitude(press, seaLevel);
     	if (length >= 8)
-    		*pfHumid = compensateHumidity(adc_H);
-    	else
-    		*pfHumid = 0.0F;
+    		humid = compensateHumidity(adc_H);
+#else
+    	float temp = (float)BME280_compensate_T_double(adc_T); // must be done 1st to set t_fineX
+    	float press = (float)BME280_compensate_P_double(adc_P);
+    	if (length >= 8)
+    		humid = (float)BME280_compensate_H_double(adc_H);
+#endif
+    	if (pfTemp)
+    		*pfTemp = temp;
+    	if (pfPress)
+    		*pfPress = press;
+    	if (pfAlt)
+    		*pfAlt = calcAltitude(press, seaLevel);
+		if (pfHumid)
+			*pfHumid = humid;
     }
