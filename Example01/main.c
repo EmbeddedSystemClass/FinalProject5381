@@ -464,8 +464,17 @@ float decodeValue(int x, int scale) {
 	return (float)x / (float)scale;
 }
 
+#define BMPE_STARTUP_AUTOREF_DELAY_MS (5 * 1000)
+
 void vTaskBMPEInput( void* pvParameters ) {
 	SampleParams *params = (SampleParams *)pvParameters;
+
+	// initially, add a delay (powerup only somehow) and then perform altitude referencing
+	if (bmpeType != BMPE_NONE) {
+		vTaskDelay( BMPE_STARTUP_AUTOREF_DELAY_MS / portTICK_RATE_MS ); // delay to stabilize data
+		bmpe_setReferencePressure();
+		DBGOUTXOLED("Initially reset reference altitude/pressure.\n");
+	}
 
 /* As per most tasks, this task is implemented in an infinite loop. */
 	for( ;; )
@@ -600,9 +609,10 @@ void vTaskDataConcentrator( void *pvParameters )
 				break; // ignore button releases
 			mode = getNextMode(mode, 1); // 2nd param includes total shutoff for debug purposes
 			// button click: if we have a pressure sensor, reset reference pressure to current value (show relative altitude w. this value)
-			if (bmpeType != BMPE_NONE)
+			if (bmpeType != BMPE_NONE) {
 				bmpe_setReferencePressure();
-			DBGOUTXOLED("Reset reference altitude/pressure.\n");
+				DBGOUTXOLED("Reset reference altitude/pressure.\n");
+			}
 			updated = TRUE;
 			break;
 		case CMD_BMPE_TEMP_DATA:
@@ -885,9 +895,6 @@ int main( void )
 		DBGOUTX("Using BMP temperature/pressure/humidity sensor.\n");
 		break;
 	}
-	// startup: set reference pressure to current value (show relative altitude to that of startup)
-	if (bmpeType != BMPE_NONE)
-		bmpe_setReferencePressure();
 	initProgress = 1;
 	extern void extra_tests();
 	extra_tests();
