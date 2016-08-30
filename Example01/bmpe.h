@@ -26,5 +26,9 @@
     extern float bmpe_readAltitude();
     extern void bmpe_setReferencePressure();
 
+    // PREFERRED METHOD OF READING SENSORS IN NORMAL MODES (filtering, etc.)
+    // Since this only sends one read command, it will get all values associated with the same sample.
+    // Individual reads of Temp, Pressure, and/or Humidity are not guaranteed to come from the same sample
+    extern void bmpe_readAllSensors(float* pfTemperature, float* pfPressure, float* pfAltitude, float* pfHumidity);
 
 #endif /* BMPE_H_ */

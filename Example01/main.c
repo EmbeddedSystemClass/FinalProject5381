@@ -471,10 +471,8 @@ void vTaskBMPEInput( void* pvParameters ) {
 	for( ;; )
 	{
 		// read the current values of the sensor data (temp, press, alt, and poss.humid)
-		float temper = bmpe_readTemperature();
-		float press = bmpe_readPressure();
-		float alt = bmpe_readAltitude();
-		float humid = bmpe_readHumidity();
+		float temper, press, alt, humid;
+		bmpe_readAllSensors(&temper, &press, &alt, &humid);
 		// create a 4-byte condensed code to detect drastic changes
 		int value = createBMPEChangeCode(temper, press, alt, humid); //adc_read_single(params->channel);
 		DBGOUTXBMPE("DEBUG - ADC value %d for ch#%d[T=%1.2f,P=%1.2f,A=%1.2f,H=%1.2f]\n", value, params->channel, temper, press, alt, humid);
@@ -853,7 +851,7 @@ SampleParams pirParams;
 SampleParams pirEdgeParams;
 
 #define BMPE_CHANNEL (0) // SPI channel 0 with SSEL0
-#define BMPE_SAMPLE_RATE_MS (13000)
+#define BMPE_SAMPLE_RATE_MS (3000)
 SampleParams bmpeParams;
 
 int initProgress = 0; // debug code
