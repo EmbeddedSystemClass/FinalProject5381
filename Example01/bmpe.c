@@ -45,6 +45,7 @@
  ***************************************************************************/
 
 #include "stdio.h" // for DBGOUT()
+#include "lpc_types.h" // for TRUE and FALSE
 //#define DEBUGOUT // uncomment this for debugging statements
 //#define DOUBLE_PRECISION // uncomment this for full-precision reference compensation (direct from data sheet)
 
@@ -191,6 +192,7 @@
 
 	//  private: module local variables and functions
     void readCoefficients(void);
+    void showTimingParameters(byte crConfig, byte crControl, byte crControlH, int isHumidOK);
 
     void		digitalWrite(byte x, byte value);
     byte		digitalRead(byte x);
@@ -215,7 +217,7 @@
 		NORMAL, // samples are created automatically as above, no filtering (Arduino compatible mode)
 		FORCED,  // must request every sample (not really supported)
     };
-    int forcedMode = FILTERED;
+    int forcedMode = NORMAL;
 
     int8_t _cs, _mosi, _miso, _sck;
 
@@ -264,19 +266,21 @@
 
       readCoefficients();
 
+      // set config and control registers (incl.control for humidity if needed)
+      byte regValueConfig=0x00, regValueControl=0x00, regValueControlH=0x00;
       if (forcedMode == NORMAL) {
     	  // OLD WAY OF "FORCED MODE"; I was actually using oversampled NORMAL mode w/o the filtering
     	  if (bmpe_hasHumidity())
-    		  write8(BME280_REGISTER_CONTROLHUMID, 0x01); // Humid sampling @ 1x -- old code would use reset value of SKIP/0, sets 20-bit data to MSBIT (0x80000)
-		  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (fast Tstandby, no filter, no 3-wire SPI)
-		  write8(BMP280_REGISTER_CONTROL, 0x3F); // 001 111 11b Temp.1x, Press.16x, NORMAL mode (oops!)
+    		  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
+    	  regValueConfig = (0x0 << 5) + (0x0 << 2) + (0x0 << 0); //0x00// reset value is 000 000 00b (fast Tstandby, no filter, no 3-wire SPI)
+		  regValueControl = (0x1 << 5) + (0x7 << 2) + (0x3 << 0); //0x3F// 001 111 11b Temp.1x, Press.16x, NORMAL mode (oops!)
       } else if (forcedMode == FORCED) {
 		  // BMP: Forced mode xfers (one at a time, no filter)
 		  //Set before CONTROL_meas (DS 5.4.3)
     	  if (bmpe_hasHumidity())
-    		  write8(BME280_REGISTER_CONTROLHUMID, 0x01); // Humid sampling @ 1x (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
-		  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
-		  write8(BMP280_REGISTER_CONTROL, 0x25); // 001 001 01b Temp.1x, Press.1x, FORCED mode
+    		  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
+    	  regValueConfig = (0x0 << 5) + (0x0 << 2) + (0x0 << 0); //0x00// reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
+    	  regValueControl = (0x1 << 5) + (0x1 << 2) + (0x1 << 0); //0x25// 001 001 01b Temp.1x, Press.1x, FORCED mode
 		  // NOTE: actual use of this requires resending the forced mode control byte EVERY TIME A SAMPLE IS DESIRED (reverts to sleep mode after completion)
 		  // This would also imply reading the status register to wait for completion of that sample.
       } else {
@@ -296,16 +300,19 @@
     	   * NOTE: This mode will also require Burst Mode Reads to avoid the problem solved by the Shadow Registers (see DS 4.1 p.21)
     	   */
 		  //Set before CONTROL_meas (DS 5.4.3)
-    	  byte regValue;
-    	  regValue = (1 << 0); // humid 1x sampling
     	  if (bmpe_hasHumidity())
-    		  write8(BME280_REGISTER_CONTROLHUMID, regValue);
-		  regValue = (0x0 << 5) + (0x2 << 2) + (0x0 << 0); //000(Tsb) 100(F) 00(3W) -> 0x10// fastest sampling/lowest Tstandby, 4x.filtering, no 3-wire SPI
-		  write8(BME280_REGISTER_CONFIG, regValue);
-		  regValue = (0x2 << 5) + (0x5 << 2) + (0x3 << 0); //010(T) 101(P) 11(M) -> 0x57// 16x oversampling Press, 2x ovs.on Temp, normal mode
-		  write8(BME280_REGISTER_CONTROL, regValue);
+        	  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
+		  regValueConfig = (0x0 << 5) + (0x2 << 2) + (0x0 << 0); //0x08//000(Tsb) 010(F) 00(3W)// fastest sampling/lowest Tstandby, 4x.filtering, no 3-wire SPI
+		  regValueControl = (0x2 << 5) + (0x5 << 2) + (0x3 << 0); //0x57//010(T) 101(P) 11(M)// 16x oversampling Press, 2x ovs.on Temp, normal mode
 		  // NOTE: in NORMAL mode, register writes are disabled until SLEEP mode is sent
       }
+      // send the control register values selected
+	  if (bmpe_hasHumidity())
+		  write8(BME280_REGISTER_CONTROLHUMID, regValueControlH);
+	  write8(BME280_REGISTER_CONFIG, regValueConfig);
+	  write8(BME280_REGISTER_CONTROL, regValueControl);
+	  // calculate and show relevant timing parameters on debug console (OPT)
+	  showTimingParameters(regValueConfig, regValueControl, regValueControlH, bmpe_hasHumidity());
 
       return bmpe_hasHumidity()? BMPE_BMETYPE: BMPE_BMPTYPE;
     }
@@ -848,4 +855,186 @@
     		*pfAlt = calcAltitude(press, seaLevel);
 		if (pfHumid)
 			*pfHumid = humid;
+    }
+
+    /**************************************************************************/
+    // calculate timing parameters as specified in Datasheet 9.1-9.4
+    /**************************************************************************/
+    float calcTmeasComponent(int osrs, float coeff1, float coeff2) {
+    	float value = 0.0;
+    	if (osrs != 0) {
+    		value = osrs * coeff1 + coeff2;
+    	}
+    	return value;
+    }
+
+    float calcTmeas(int osrsT, int osrsP, int osrsH, float coeff1, float coeff2, float coeff3) {
+    	float value = coeff3;
+    	value += calcTmeasComponent(osrsT, coeff1, 0.0);
+    	value += calcTmeasComponent(osrsP, coeff1, coeff2);
+    	value += calcTmeasComponent(osrsH, coeff1, coeff2);
+    	return value;
+    }
+
+    float calcTstandbyMsec(byte tsbCode, int humidOK) {
+    	// Datasheet Table 27, p.28
+    	float result = 0.5;
+    	switch (tsbCode) {
+    	case 1:
+    		result = 62.5;
+    		break;
+    	case 2:
+    		result = 125.0;
+    		break;
+    	case 3:
+    		result = 250.0;
+    		break;
+    	case 4:
+    		result = 500.0;
+    		break;
+    	case 5:
+    		result = 1000.0;
+    		break;
+    	case 6:
+    		result = (humidOK? 10.0: 2000.0);
+    		break;
+    	case 7:
+    		result = (humidOK? 20.0: 4000.0);
+    		break;
+    	default:
+    		break;
+    	}
+    	return result;
+    }
+
+    int getOversampling(byte osrsCode) {
+    	// Datasheet Tables 20, 23, 24 on pp.26-27
+    	int result = 0;
+    	switch (osrsCode) {
+    	case 1:
+    		result = 1;
+    		break;
+    	case 2:
+    		result = 2;
+    		break;
+    	case 3:
+    		result = 4;
+    		break;
+    	case 4:
+    		result = 8;
+    		break;
+    	case 5:
+    		result = 16;
+    		break;
+    	default:
+    		break;
+    	}
+    	return result;
+    }
+
+    int getFilterCoeffs(byte filterCode) {
+    	// Datasheet Table 28, p.28
+    	int result = 0;
+    	switch (filterCode) {
+    	case 1:
+    		result = 2;
+    		break;
+    	case 2:
+    		result = 4;
+    		break;
+    	case 3:
+    		result = 8;
+    		break;
+    	case 4:
+    		result = 16;
+    		break;
+    	default:
+    		break;
+    	}
+    	return result;
+    }
+
+    int calcNSamplesTo75Pct(int filterCode) {
+    	// Datasheet Table 6 p.16
+    	int result = 1;
+    	switch (filterCode) {
+    	case 1: // 2 coeffs
+    		result = 2;
+    		break;
+    	case 2: // 4 coeffs
+    		result = 5;
+    		break;
+    	case 3: // 8 coeffs
+    		result = 11;
+    		break;
+    	case 4: // 16 coeffs
+    		result = 22;
+    		break;
+    	default:
+    		break;
+    	}
+    	return result;
+    }
+
+    void showTimingParameters(byte crConfig, byte crControl, byte crControlH, int isHumidOK) {
+		// extract the various fields
+		/*
+		* According to the datasheet Sec 3.5.3 (p.18 and Table 9), we want the following settings in CONTROL and CONFIG registers
+		* 	CONFIG.7:5 (3b)  = 000 (0 << 5)		Tstandby = 0.5ms (fastest) [0=0.5msec, 1=62.5, 2=125, 3=250, 4=500, 5=1000, 6=2000(P)/10(E), 7=4000(P)/20(E)]
+		* 	CONFIG.4:2 (3b)  = 100 (4 << 2)		Filter ON using 16 coeffs [0=OFF, 1=2, 2=4, 3=8, 4=16, 5+=reserved]
+		* 	CONFIG.1:0 (2b)  =  00 (0 << 0)		Use 3-wire SPI OFF [1=ON, 2,3 are reserved - DO NOT USE]
+		*
+		* 	CTROL_H.2:0 (3b) = 001 (1 << 0)		Humidity 1x oversampling [ same meaning as Temperature ]
+		*
+		* 	CONTROL.7:5 (3b) = 010 (2 << 5)		Temperature 2x oversampling [0=SKIP, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x, 6+=reserved]
+		* 	CONTROL.4:2 (3b) = 101 (5 << 2)		Pressure 16x oversampling [ same meaning as Temperature ]
+		* 	CONTROL.1:0 (2b) =  11 (3 << 0)		Normal mode [0 is sleep, 1/2 is forced, 3 is normal]
+		*
+		*/
+    	const char* typeStr = (isHumidOK? "BME/TempPressAltHumid": "BMP/TempPressAlt");
+    	byte t_standbyCode = (crConfig >> 5) & 0b111;
+    	byte filter = (crConfig >> 2) & 0b111;
+    	byte mode = (crControl >> 0) & 0b11;
+    	byte osrs_tCode = (crControl >> 5) & 0b111;
+    	byte osrs_pCode = (crControl >> 2) & 0b111;
+    	byte osrs_hCode = (crControlH >> 0) & 0b111;
+    	int forcedMode = (mode == 1 || mode == 2)? TRUE: FALSE;
+    	int normalMode = (mode == 3)? TRUE: FALSE;
+    	int osrs_t = getOversampling(osrs_tCode);
+    	int osrs_p = getOversampling(osrs_pCode);
+    	int osrs_h = getOversampling(osrs_hCode);
+    	float t_measure_typ = calcTmeas(osrs_t, osrs_p, osrs_h, 2.0, 0.5, 1.0); // msec
+    	float t_measure_max = calcTmeas(osrs_t, osrs_p, osrs_h, 2.3, 0.575, 1.25); // msec
+    	float t_standby = calcTstandbyMsec(t_standbyCode, isHumidOK);
+    	float ODR_typ = 1.0; // Hz
+    	const char* modeStr = "SLEEP";
+    	const char* calcStr = "";
+    	if (forcedMode) {
+    		ODR_typ = 1000.0 / (t_measure_typ);
+    		modeStr = "FORCED";
+    		calcStr = "=1000/t_meas_typ";
+    	}
+    	if (normalMode) {
+    		ODR_typ = 1000.0 / (t_measure_typ + t_standby);
+    		modeStr = "NORMAL";
+    		calcStr = "=1000/(t_meas_typ+t_standby)";
+    	}
+    	float t_response75Pct = -1.0; // N.A. if no filtering
+    	int nSamps75 = -1;
+    	if (filter != 0) {
+    		nSamps75 = calcNSamplesTo75Pct(filter);
+    		t_response75Pct = nSamps75 * 1000.0 / ODR_typ; // msec
+    	}
+    	printf("Environmental Sensor Timing:\n-----\n");
+    	printf("Operating %s in %s mode.\n", typeStr, modeStr);
+    	printf("Oversampling temp %dx, press %dx, humid %dx\n", osrs_t, osrs_p, osrs_h);
+    	printf("Measurement time (ms) = %1.2f (typ), %1.2f (max)\n", t_measure_typ, t_measure_max);
+    	if (normalMode)
+    		printf("Standby time (ms) = %1.2f\n", t_standby);
+    	printf("ODR data rate (Hz,%s) = %1.2f\n", calcStr, ODR_typ);
+    	if (filter != 0)
+    		printf("Filtering w.%d coeffs -- %d samples gets you to 75%% response in t_75resp (ms) = %1.2f\n", getFilterCoeffs(filter), nSamps75, t_response75Pct);
+    	else
+    		printf("No filtering applied.\n");
+    	printf("-----\n");
     }
