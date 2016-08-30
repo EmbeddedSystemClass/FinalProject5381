@@ -254,13 +254,13 @@
 			pinMode(_miso, INPUT);
 		}
 
+      // need to set SLEEP mode to read registers and coefficients
+	  write8(BMP280_REGISTER_CONTROL, 0x00); // reset value is 000 000 00b (skip Temp and Press (set to MSBIT), SLEEP mode)
+	  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
+
       _chipID = read8(BME280_REGISTER_CHIPID);
       if (_chipID != 0x60 && _chipID != 0x58) // NOTE: chip pre-productions samples of BMP also returned 0x56 or 0x57
         return BMPE_NONE;
-
-      // need to set SLEEP mode to read coefficients
-	  write8(BMP280_REGISTER_CONFIG, 0x00); // reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
-	  write8(BMP280_REGISTER_CONTROL, 0x00); // reset value is 000 000 00b (skip Temp and Press (set to MSBIT), SLEEP mode)
 
       readCoefficients();
 
@@ -283,13 +283,16 @@
     	  /*
     	   * NOTE: For usage in delta-height feature, we want lowest noise and highest accuracy. No need to oversample humidity, tho, it doesn't get noisy.
     	   * According to the datasheet Sec 3.5.3 (p.18 and Table 9), we want the following settings in CONTROL and CONFIG registers
-    	   * 	CONTROL.7:5 (3b) = 010 (2 << 5)		Temperature 2x oversampling [0=SKIP, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x, 6+=reserved]
-    	   * 	CONTROL.4:2 (3b) = 101 (5 << 2)		Pressure 16x oversampling [ same meaning as Temperature ]
-    	   * 	CONTROL.1:0 (2b) =  11 (3 << 0)		Normal mode [0 is sleep, 1/2 is forced, 3 is normal]
-    	   * 	CTROL_H.2:0 (3b) = 001 (1 << 0)		Humidity 1x oversampling [ same meaning as Temperature ]
     	   * 	CONFIG.7:5 (3b)  = 000 (0 << 5)		Tstandby = 0.5ms (fastest) [0=0.5msec, 1=62.5, 2=125, 3=250, 4=500, 5=1000, 6=2000(P)/10(E), 7=4000(P)/20(E)]
     	   * 	CONFIG.4:2 (3b)  = 100 (4 << 2)		Filter ON using 16 coeffs [0=OFF, 1=2, 2=4, 3=8, 4=16, 5+=reserved]
     	   * 	CONFIG.1:0 (2b)  =  00 (0 << 0)		Use 3-wire SPI OFF [1=ON, 2,3 are reserved - DO NOT USE]
+    	   *
+    	   * 	CTROL_H.2:0 (3b) = 001 (1 << 0)		Humidity 1x oversampling [ same meaning as Temperature ]
+    	   *
+    	   * 	CONTROL.7:5 (3b) = 010 (2 << 5)		Temperature 2x oversampling [0=SKIP, 1=1x, 2=2x, 3=4x, 4=8x, 5=16x, 6+=reserved]
+    	   * 	CONTROL.4:2 (3b) = 101 (5 << 2)		Pressure 16x oversampling [ same meaning as Temperature ]
+    	   * 	CONTROL.1:0 (2b) =  11 (3 << 0)		Normal mode [0 is sleep, 1/2 is forced, 3 is normal]
+    	   *
     	   * NOTE: This mode will also require Burst Mode Reads to avoid the problem solved by the Shadow Registers (see DS 4.1 p.21)
     	   */
 		  //Set before CONTROL_meas (DS 5.4.3)
