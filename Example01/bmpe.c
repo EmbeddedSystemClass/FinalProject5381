@@ -300,7 +300,7 @@
     	  regValue = (1 << 0); // humid 1x sampling
     	  if (bmpe_hasHumidity())
     		  write8(BME280_REGISTER_CONTROLHUMID, regValue);
-		  regValue = (0x0 << 5) + (0x4 << 2) + (0x0 << 0); //000(Tsb) 100(F) 00(3W) -> 0x10// fastest sampling/lowest Tstandby, max.filtering, no 3-wire SPI
+		  regValue = (0x0 << 5) + (0x2 << 2) + (0x0 << 0); //000(Tsb) 100(F) 00(3W) -> 0x10// fastest sampling/lowest Tstandby, 4x.filtering, no 3-wire SPI
 		  write8(BME280_REGISTER_CONFIG, regValue);
 		  regValue = (0x2 << 5) + (0x5 << 2) + (0x3 << 0); //010(T) 101(P) 11(M) -> 0x57// 16x oversampling Press, 2x ovs.on Temp, normal mode
 		  write8(BME280_REGISTER_CONTROL, regValue);
