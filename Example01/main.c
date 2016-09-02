@@ -35,7 +35,6 @@
 #include "task.h"
 #include "queue.h"
 #include "timers.h"
-#include "lpc17xx_gpio.h"
 /* FreeRTOS+IO includes. */
 //#include "FreeRTOS_IO.h"
 
@@ -52,6 +51,7 @@
 #include "pb.h"
 #include "simple7.h"
 #include "bmpe.h"
+#include "oled.h"
 
 //#define DACOUTPUT // uncomment this line to add support for DAC output for optional ADC testing
 #define TEST_SEQUENCES // uncomment this line to add support for sequence testing, such as the 7-segment display
@@ -885,6 +885,8 @@ int main( void )
 	occ_init();
 	// init the 7-segment LED GPIO pins
 	s7_init();
+	// init the OLED display system
+	oled_init( OLED_DC, OLED_RST, OLED_CS, 1 ); // last parameter is reset command (1=yes, 0=no)
 	// init the BMP/BME sensor system
 	bmpeType = bmpe_init();
 	switch (bmpeType) {

@@ -10,6 +10,8 @@
 
 #include "stdint.h"
 
+#include "delay.h"
+
 #define MSBFIRST (0)
 #define SPI_MODE0 (0)
 
