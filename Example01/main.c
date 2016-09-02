@@ -886,7 +886,7 @@ int main( void )
 	// init the 7-segment LED GPIO pins
 	s7_init();
 	// init the OLED display system
-	oled_init( OLED_DC, OLED_RST, OLED_CS, 1 ); // last parameter is reset command (1=yes, 0=no)
+	oled_init( 1 ); // parameter is reset command (1=yes, 0=no)
 	// init the BMP/BME sensor system
 	bmpeType = bmpe_init();
 	switch (bmpeType) {

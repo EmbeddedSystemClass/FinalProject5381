@@ -13,6 +13,9 @@
 
 #ifdef __cplusplus
 	extern "C" {
+#define EXTERN
+#else
+#define EXTERN extern
 #endif
 
 	// Define the GPIO pincode values (used by the SPI library) for the D/C, RST, and CS pins
@@ -22,13 +25,13 @@
 #define OLED_RST ((1<<5) | (19))
 #define OLED_CS ((1<<5) | (20))
 
-	int oled_init(int DC, int RST, int CS, int reset);
+EXTERN int oled_init(int reset);
 
-	  void clearDisplay(void);
-	  void invertDisplay(int i);
-	  void display();
+EXTERN void clearDisplay(void);
+EXTERN void invertDisplay(int i);
+EXTERN void display();
 
-	  void dim(int dim_1_or_0);
+EXTERN void dim(int dim_1_or_0);
 
 #ifdef __cplusplus
 	}
