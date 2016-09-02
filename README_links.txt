@@ -22,3 +22,6 @@ PIR Motion Sensor: https://learn.adafruit.com/pir-passive-infrared-proximity-mot
 BMP280 Sensor (Temp/Press): https://learn.adafruit.com/adafruit-bmp280-barometric-pressure-plus-temperature-sensor-breakout/
 BME280 Sensor (Temp/Press/Humid): https://learn.adafruit.com/adafruit-bme280-humidity-barometric-pressure-temperature-sensor-breakout/
 Small Mono OLED Displays: https://learn.adafruit.com/monochrome-oled-breakouts/
+-----
+Schematics:
+BME280 board (Adafruit): https://learn.adafruit.com/assets/26693
