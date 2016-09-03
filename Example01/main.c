@@ -833,7 +833,20 @@ void vTaskOLEDOutput( void* pvParameters ) {
 	// OLED setup sequence:
 	// init the display
 	oled_begin(1); // start off with a display reset and register inits
+	vTaskDelay(1000);
 	oled_clearDisplay();
+	vTaskDelay(1000);
+	oled_invertDisplay(1);
+	vTaskDelay(1000);
+	oled_invertDisplay(0);
+	vTaskDelay(1000);
+	oled_invertDisplay(1);
+	vTaskDelay(1000);
+	oled_invertDisplay(0);
+	vTaskDelay(1000);
+	oled_invertDisplay(1);
+	vTaskDelay(1000);
+	oled_invertDisplay(0);
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 

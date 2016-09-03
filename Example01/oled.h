@@ -29,7 +29,7 @@ EXTERN int oled_init(void);
 EXTERN int oled_begin(int reset);
 
 EXTERN void oled_clearDisplay(void);
-EXTERN void oled_invertDisplay(int i);
+EXTERN void oled_invertDisplay(int i_0_is_normal_1_is_inverted);
 EXTERN void oled_display();
 
 EXTERN void oled_dim(int dim_1_or_0);
