@@ -217,7 +217,7 @@
 		NORMAL, // samples are created automatically as above, no filtering (Arduino compatible mode)
 		FORCED,  // must request every sample (not really supported)
     };
-    int forcedMode = NORMAL;
+    int forcedMode = FILTERED;
 
     int8_t _cs, _mosi, _miso, _sck;
 
