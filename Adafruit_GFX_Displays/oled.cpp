@@ -36,7 +36,7 @@ int oled_begin(int reset) {
 	// it assumes SPI has already been set up by someone else (i.e., the BMPE driver)
 	// it then sets up SPI transfer mode and sends a series of commands to the device to initialize it
 	OLED.begin(SSD1306_SWITCHCAPVCC, SSD1306_I2C_ADDRESS, (reset==1), true);
-	debugRAM();
+//	debugRAM();
 	OLED.display(); // send RAM buffer to the hardware (initially set up with logo)
 	return 0;
 }

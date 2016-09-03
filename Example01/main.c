@@ -833,20 +833,12 @@ void vTaskOLEDOutput( void* pvParameters ) {
 	// OLED setup sequence:
 	// init the display
 	oled_begin(1); // start off with a display reset and register inits
-	vTaskDelay(1000);
-	oled_clearDisplay();
-	vTaskDelay(1000);
+	vTaskDelay(5000);
 	oled_invertDisplay(1);
-	vTaskDelay(1000);
+//	vTaskDelay(1000);
 	oled_invertDisplay(0);
-	vTaskDelay(1000);
-	oled_invertDisplay(1);
-	vTaskDelay(1000);
-	oled_invertDisplay(0);
-	vTaskDelay(1000);
-	oled_invertDisplay(1);
-	vTaskDelay(1000);
-	oled_invertDisplay(0);
+
+	int ticker = 0;
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
@@ -856,6 +848,20 @@ void vTaskOLEDOutput( void* pvParameters ) {
 		DisplayResult data;
 		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
 
+		switch (ticker & 0x03) {
+		case 0:
+			oled_invertDisplay(1);
+			break;
+		case 1:
+			//oled_clearDisplay();
+			break;
+		case 2:
+			oled_invertDisplay(0);
+			break;
+		default:
+			break;
+		}
+		ticker++;
 		// process data with output to OLED multiline display
 		DBGOUTXOLED("Temperature(deg.F): %1.2f, (deg.C): %1.2f\nPressure(inHg): %1.2f, (hPa): %1.2f\nHumidity(%%): %1.2f\nRel.Altitude Since Reset(ft): %1.2f, (m): %1.2f\n\n",
 				FAHR(data.temp), data.temp, INHG(data.press), data.press, data.humid, METERS2FEET(data.altitude), data.altitude);

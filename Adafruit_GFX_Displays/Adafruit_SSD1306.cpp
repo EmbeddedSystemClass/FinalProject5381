@@ -471,36 +471,58 @@ void Adafruit_SSD1306::dim(boolean dim) {
 }
 
 void Adafruit_SSD1306::display(void) {
-  ssd1306_command(SSD1306_COLUMNADDR);
-  ssd1306_command(0);   // Column start address (0 = reset)
-  ssd1306_command(SSD1306_LCDWIDTH-1); // Column end address (127 = reset)
-
-  ssd1306_command(SSD1306_PAGEADDR);
-  ssd1306_command(0); // Page start address (0 = reset)
-  #if SSD1306_LCDHEIGHT == 64
-    ssd1306_command(7); // Page end address
-  #endif
-  #if SSD1306_LCDHEIGHT == 32
-    ssd1306_command(3); // Page end address
-  #endif
-  #if SSD1306_LCDHEIGHT == 16
-    ssd1306_command(1); // Page end address
-  #endif
+//	  ssd1306_command(SSD1306_MEMORYMODE);                    // 0x20
+//	  ssd1306_command(0x00);                                  // 0x0 act like ks0108
+////	  ssd1306_command(SSD1306_SEGREMAP | 0x1);
+////	  ssd1306_command(SSD1306_COMSCANDEC);
+//  ssd1306_command(SSD1306_COLUMNADDR);
+//  ssd1306_command(0);   // Column start address (0 = reset)
+//  ssd1306_command(SSD1306_LCDWIDTH-1); // Column end address (127 = reset)
+//
+//  ssd1306_command(SSD1306_PAGEADDR);
+//  ssd1306_command(0); // Page start address (0 = reset)
+//  #if SSD1306_LCDHEIGHT == 64
+//    ssd1306_command(7); // Page end address
+//  #endif
+//  #if SSD1306_LCDHEIGHT == 32
+//    ssd1306_command(3); // Page end address
+//  #endif
+//  #if SSD1306_LCDHEIGHT == 16
+//    ssd1306_command(1); // Page end address
+//  #endif
 
   if (sid != -1)
   {
     // SPI
-#ifdef HAVE_PORTREG
-    *csport |= cspinmask;
-    *dcport |= dcpinmask;
-    *csport &= ~cspinmask;
-#else
-    digitalWrite(cs, HIGH);
-    digitalWrite(dc, HIGH);
-    digitalWrite(cs, LOW);
-#endif
+//#ifdef HAVE_PORTREG
+//    *csport |= cspinmask;
+//    *dcport |= dcpinmask;
+//    *csport &= ~cspinmask;
+//#else
+//    digitalWrite(cs, HIGH);
+//    digitalWrite(dc, HIGH);
+//    digitalWrite(cs, LOW);
+//#endif
 
+    int page = 0;
     for (uint16_t i=0; i<(SSD1306_LCDWIDTH*SSD1306_LCDHEIGHT/8); i++) {
+    	if ((i%128)==0) {
+    		// we seem to be doing page mode always - bad chip? old chip?
+    		// every 128 bytes, we send a page address (0-7) and reset the column to 0 (one nybble at a time)
+    		// enter command mode
+    	    digitalWrite(cs, HIGH);
+    	    digitalWrite(dc, LOW);
+    	    digitalWrite(cs, LOW);
+    		// send the page mode commands here
+    	    fastSPIwrite(0xB0 + (page & 0x07));
+    	    fastSPIwrite(0x00); // reset column to 0 each page (LSNyb)
+    	    fastSPIwrite(0x10); // reset column to 0 each page (MSNyb)
+    	    page++;
+    		// enter data mode
+    	    digitalWrite(cs, HIGH);
+    	    digitalWrite(dc, HIGH);
+    	    digitalWrite(cs, LOW);
+    	}
       fastSPIwrite(buffer[i]);
     }
 #ifdef HAVE_PORTREG
