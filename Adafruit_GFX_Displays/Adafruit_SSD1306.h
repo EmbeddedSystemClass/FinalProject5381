@@ -163,6 +163,8 @@ class Adafruit_SSD1306 : public Adafruit_GFX {
   void dim(boolean dim);
 
   void drawPixel(int16_t x, int16_t y, uint16_t color);
+  // MLM DEBUG - get a single pixel bit (0/1) or -1 if params out of range
+  int getPixel(int16_t x, int16_t y);
 
   virtual void drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
   virtual void drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);

@@ -86,6 +86,23 @@ Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h):
   gfxFont   = NULL;
 }
 
+void Adafruit_GFX::init_int(int16_t w, int16_t h)
+{
+	// MLM DEBUG - compensate for compiler issues
+//	Adafruit_GFX *pThis = const_cast<Adafruit_GFX *>(this);
+//	pThis->WIDTH = w;
+//	pThis->HEIGHT = h;
+	  _width    = w;
+	  _height   = h;
+	  rotation  = 0;
+	  cursor_y  = cursor_x    = 0;
+	  textsize  = 1;
+	  textcolor = textbgcolor = 0xFFFF;
+	  wrap      = true;
+	  _cp437    = false;
+	  gfxFont   = NULL;
+}
+
 // Draw a circle outline
 void Adafruit_GFX::drawCircle(int16_t x0, int16_t y0, int16_t r,
  uint16_t color) {

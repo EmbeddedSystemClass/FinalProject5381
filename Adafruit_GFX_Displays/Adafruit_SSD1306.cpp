@@ -149,6 +149,39 @@ void Adafruit_SSD1306::drawPixel(int16_t x, int16_t y, uint16_t color) {
 
 }
 
+// MLM DEBUG - get a single pixel bit (0/1) or -1 if params out of range
+int Adafruit_SSD1306::getPixel(int16_t x, int16_t y)
+{
+  if ((x < 0) || (x >= width()) || (y < 0) || (y >= height()))
+    return -1;
+
+  // check rotation, move pixel around if necessary
+  switch (getRotation()) {
+  case 1:
+    ssd1306_swap(x, y);
+    x = WIDTH - x - 1;
+    break;
+  case 2:
+    x = WIDTH - x - 1;
+    y = HEIGHT - y - 1;
+    break;
+  case 3:
+    ssd1306_swap(x, y);
+    y = HEIGHT - y - 1;
+    break;
+  }
+
+  // x is which column
+	//    switch (color)
+	//    {
+	//      case WHITE:   buffer[x+ (y/8)*SSD1306_LCDWIDTH] |=  (1 << (y&7)); break;
+	//      case BLACK:   buffer[x+ (y/8)*SSD1306_LCDWIDTH] &= ~(1 << (y&7)); break;
+	//      case INVERSE: buffer[x+ (y/8)*SSD1306_LCDWIDTH] ^=  (1 << (y&7)); break;
+	//    }
+  return (buffer[x+ (y/8)*SSD1306_LCDWIDTH] & (1 << (y&7)))? 1: 0;
+}
+
+
 Adafruit_SSD1306::Adafruit_SSD1306(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS) : Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT) {
   cs = CS;
   rst = RST;
@@ -176,12 +209,9 @@ Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT) {
 // MLM, 9/2/2016 - needed to add initializers for static object (set to 0, but not constructed properly? what about base class ctor then???)
 // initializer for hardware SPI - we indicate DataCommand, ChipSelect, Reset
 void Adafruit_SSD1306::init(int8_t DC, int8_t RST, int8_t CS) {
-  dc = DC;
-  rst = RST;
-  cs = CS;
-//  hwSPI = true;
-  // run the in-place ctor of the base class again?
+  // run the in-place ctor of the base class again? TOTAL KLUDGE! but should work here for testing
   //Adafruit_GFX::Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+	init_int(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
   dc = DC;
   rst = RST;
   cs = CS;
