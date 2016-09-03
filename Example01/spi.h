@@ -28,6 +28,7 @@ enum {
 EXTERN void spi_pinWrite(int pincode, int val); // GPIO pin write (any SSEL, incl. P0.16 for SPI0 main device)
 EXTERN int spi_pinRead(int pincode); // GPIO pin read
 EXTERN void spi_pinMode(int pincode, int dir_in_is_zero); // set direction of GPIO pin
+EXTERN void spi_pinConfig(int pincode, int setupCode); // setup LPC-1769 operation of any GPIO pin
 
 EXTERN int spi_init(int ssel_pincode);
 EXTERN void *SPISettings(int clk, int msls, int mode);

@@ -829,6 +829,12 @@ void vTaskSimple7Output( void *pvParameters )
 #define INHG(hp) ((float)((hp) / 33.863752577878))
 #define METERS2FEET(m) ((float)((m) * 3.28084))
 void vTaskOLEDOutput( void* pvParameters ) {
+
+	// OLED setup sequence:
+	// init the display
+	oled_begin(1); // start off with a display reset and register inits
+	oled_clearDisplay();
+
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
 	for( ;; )
@@ -886,7 +892,7 @@ int main( void )
 	// init the 7-segment LED GPIO pins
 	s7_init();
 	// init the OLED display system
-	oled_init( 1 ); // parameter is reset command (1=yes, 0=no)
+	oled_init();
 	// init the BMP/BME sensor system
 	bmpeType = bmpe_init();
 	switch (bmpeType) {

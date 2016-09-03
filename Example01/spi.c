@@ -172,6 +172,22 @@ int spi_init(int ssel) {
 	return 0;
 }
 
+void spi_pinConfig(int pincode, int setupCode) {
+	int port, pin;
+	getPortAndPin(pincode, &port, &pin);
+	// config the given pin for a function, and set its mask bit to 0
+	PINSEL_CFG_Type config;
+	config.OpenDrain = PINSEL_PINMODE_NORMAL;
+	config.Pinmode = PINSEL_PINMODE_TRISTATE;
+	config.Funcnum = PINSEL_FUNC_0; // GPIO
+	config.Portnum = port;
+	config.Pinnum = pin;
+	PINSEL_ConfigPin(&config);
+	// set the output mask bit to 0 to allow outputs through
+	FIO_SetMask(port, (1<<pin), 0);
+	// ALSO, don't forget to call spi_pinMode() to set the direction for input or output
+}
+
 void *SPISettings(int clk, int msls, int mode) {
 	currentSettings.Mode = SPI_MASTER_MODE;
 	currentSettings.Databit = SPI_DATABIT_8;

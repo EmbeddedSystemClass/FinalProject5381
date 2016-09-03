@@ -25,13 +25,14 @@
 #define OLED_RST ((1<<5) | (19))
 #define OLED_CS ((1<<5) | (20))
 
-EXTERN int oled_init(int reset);
+EXTERN int oled_init(void);
+EXTERN int oled_begin(int reset);
 
-EXTERN void clearDisplay(void);
-EXTERN void invertDisplay(int i);
-EXTERN void display();
+EXTERN void oled_clearDisplay(void);
+EXTERN void oled_invertDisplay(int i);
+EXTERN void oled_display();
 
-EXTERN void dim(int dim_1_or_0);
+EXTERN void oled_dim(int dim_1_or_0);
 
 #ifdef __cplusplus
 	}
