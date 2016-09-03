@@ -173,8 +173,23 @@ Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT) {
   rst = reset;
 }
 
+// MLM, 9/2/2016 - needed to add initializers for static object (set to 0, but not constructed properly? what about base class ctor then???)
+// initializer for hardware SPI - we indicate DataCommand, ChipSelect, Reset
+void Adafruit_SSD1306::init(int8_t DC, int8_t RST, int8_t CS) {
+  dc = DC;
+  rst = RST;
+  cs = CS;
+//  hwSPI = true;
+  // run the in-place ctor of the base class again?
+  //Adafruit_GFX::Adafruit_GFX(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+  dc = DC;
+  rst = RST;
+  cs = CS;
+  hwSPI = true;
+}
 
-void Adafruit_SSD1306::begin(uint8_t vccstate, uint8_t i2caddr, bool reset) {
+
+void Adafruit_SSD1306::begin(uint8_t vccstate, uint8_t i2caddr, bool reset, bool sharedSPI) {
   _vccstate = vccstate;
   _i2caddr = i2caddr;
 
@@ -200,7 +215,8 @@ void Adafruit_SSD1306::begin(uint8_t vccstate, uint8_t i2caddr, bool reset) {
 #endif
       }
     if (hwSPI){
-    	spi_init(cs);
+    	if (!sharedSPI) // MLM: suppress this if someone else aready set up the hardware SPI
+    		spi_init(cs);
 #ifdef SPI_HAS_TRANSACTION
     	spi_beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
 #else
