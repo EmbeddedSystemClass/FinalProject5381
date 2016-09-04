@@ -853,7 +853,7 @@ void vTaskOLEDOutput( void* pvParameters ) {
 			oled_invertDisplay(1);
 			break;
 		case 1:
-			//oled_clearDisplay();
+			oled_clearDisplay();
 			break;
 		case 2:
 			oled_invertDisplay(0);
@@ -886,7 +886,7 @@ SampleParams pirParams;
 SampleParams pirEdgeParams;
 
 #define BMPE_CHANNEL (0) // SPI channel 0 with SSEL0
-#define BMPE_SAMPLE_RATE_MS (3000)
+#define BMPE_SAMPLE_RATE_MS (5000)
 SampleParams bmpeParams;
 
 int initProgress = 0; // debug code

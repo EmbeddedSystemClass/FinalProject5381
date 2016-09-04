@@ -15,8 +15,46 @@ extern "C" {
 
 #include "Adafruit_SSD1306.h"
 
-Adafruit_SSD1306 OLED(OLED_DC, OLED_RST, OLED_CS);
+// The following "LOGO" was generated from a mono BMP file by The Dot Factory: http://www.eran.io/the-dot-factory-an-lcd-font-and-image-generator/
+// Postprocessing needed: rename "uint_8" to "uint8_t", add square brackets after bitmap name (oops!)
+//
+//  Image data for himom
+//
+
+const uint8_t himomBitmap[] =
+{
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, //                                                                                                         ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0xC0, 0x0F, 0x80, 0x7F, 0x01, 0xF0, 0x03, 0xE0, 0xE0, // ###       ###    ###                 #####          #####        #######       #####          #####     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0xE0, 0x1F, 0x81, 0xFF, 0x81, 0xF8, 0x07, 0xE0, 0xE0, // ###       ###    ###                 ######        ######      ##########      ######        ######     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0xE0, 0x1F, 0x83, 0xFF, 0xC1, 0xF8, 0x07, 0xE0, 0xE0, // ###       ###    ###                 ######        ######     ############     ######        ######     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0xF0, 0x1F, 0x87, 0xC1, 0xE1, 0xFC, 0x07, 0xE0, 0xE0, // ###       ###    ###                 #######       ######    #####     ####    #######       ######     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x70, 0x3B, 0x87, 0x00, 0xE1, 0xDC, 0x0E, 0xE0, 0xE0, // ###       ###    ###                 ### ###      ### ###    ###        ###    ### ###      ### ###     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x70, 0x3B, 0x8F, 0x00, 0x71, 0xDC, 0x0E, 0xE0, 0xE0, // ###       ###    ###                 ### ###      ### ###   ####         ###   ### ###      ### ###     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x78, 0x7B, 0x8E, 0x00, 0x71, 0xDE, 0x1E, 0xE0, 0xE0, // ###       ###    ###                 ### ####    #### ###   ###          ###   ### ####    #### ###     ###
+	0xFF, 0xF8, 0x70, 0x00, 0x07, 0x38, 0x73, 0x8E, 0x00, 0x71, 0xCE, 0x1C, 0xE0, 0xE0, // #############    ###                 ###  ###    ###  ###   ###          ###   ###  ###    ###  ###     ###
+	0xFF, 0xF8, 0x70, 0x00, 0x07, 0x3C, 0x73, 0x8E, 0x00, 0x71, 0xCF, 0x1C, 0xE0, 0xE0, // #############    ###                 ###  ####   ###  ###   ###          ###   ###  ####   ###  ###     ###
+	0xFF, 0xF8, 0x70, 0x00, 0x07, 0x3C, 0xE3, 0x8E, 0x00, 0x71, 0xCF, 0x38, 0xE0, 0xE0, // #############    ###                 ###  ####  ###   ###   ###          ###   ###  ####  ###   ###     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x1C, 0xE3, 0x8E, 0x00, 0x71, 0xC7, 0x38, 0xE0, 0xE0, // ###       ###    ###                 ###   ###  ###   ###   ###          ###   ###   ###  ###   ###     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x1F, 0xE3, 0x8E, 0x00, 0xF1, 0xC7, 0xF8, 0xE0, 0xE0, // ###       ###    ###                 ###   ########   ###   ###         ####   ###   ########   ###     ###
+	0xE0, 0x38, 0x70, 0x00, 0x07, 0x0F, 0xC3, 0x87, 0x00, 0xE1, 0xC3, 0xF0, 0xE0, 0x00, // ###       ###    ###                 ###    ######    ###    ###        ###    ###    ######    ###
+	0xE0, 0x38, 0x70, 0xE0, 0x07, 0x0F, 0xC3, 0x87, 0x83, 0xE1, 0xC3, 0xF0, 0xE0, 0xE0, // ###       ###    ###    ###          ###    ######    ###    ####     #####    ###    ######    ###     ###
+	0xE0, 0x38, 0x70, 0xE0, 0x07, 0x0F, 0x83, 0x83, 0xFF, 0xC1, 0xC3, 0xE0, 0xE0, 0xE0, // ###       ###    ###    ###          ###    #####     ###     ############     ###    #####     ###     ###
+	0xE0, 0x38, 0x70, 0xE0, 0x07, 0x07, 0x83, 0x81, 0xFF, 0x81, 0xC1, 0xE0, 0xE0, 0xE0, // ###       ###    ###    ###          ###     ####     ###      ##########      ###     ####     ###     ###
+	0xE0, 0x38, 0x70, 0xE0, 0x07, 0x07, 0x83, 0x80, 0xFE, 0x01, 0xC1, 0xE0, 0xE0, 0xE0, // ###       ###    ###    ###          ###     ####     ###       #######        ###     ####     ###     ###
+	0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //                         ##
+	0x00, 0x00, 0x01, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //                        ###
+	0x00, 0x00, 0x03, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //                       ###
+	0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //                       ##
+};
+
+// Bitmap sizes for himom
+const uint8_t himomWidthPages = 14;
+const uint8_t himomHeightPixels = 22;
+
 void debugRAM(void);
+void copyToRAM(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color);
+
+Adafruit_SSD1306 OLED(OLED_DC, OLED_RST, OLED_CS);
 
 // set up the pins on the LPC-1769 via the class into the SPI implementation (doesn't work for I2C for now)
 // will return 0 if cannot instantiate the class, 1 if it's good to go
@@ -43,6 +81,16 @@ int oled_begin(int reset) {
 
 void oled_clearDisplay(void) {
 	OLED.clearDisplay(); // RAM buffer only
+	copyToRAM(10, 20, himomBitmap, himomWidthPages * 8, himomHeightPixels, 1);
+//	OLED.drawCircle(32, 32, 16, 1);
+//	OLED.drawRect(0, 0, 10, 10, 1);
+//	OLED.drawLine(0, 0, 10, 10, 1);
+//	OLED.blastDisplay(himomBitmap, himomWidthPages * himomHeightPixels);
+//	OLED.setTextSize(1);
+//	OLED.setTextColor(WHITE);
+//	OLED.setCursor(0,0);
+//	OLED.println("Hello, Mom!"); // crashes due to C++ virtual function tables not being initialized!
+
 	OLED.display(); // to the hardware
 	return;
 }
@@ -51,6 +99,21 @@ void oled_invertDisplay(int inverted) {
 	OLED.invertDisplay(inverted); // RAM buffer only
 	OLED.display(); // to the hardware
 	return;
+}
+
+uint8_t read_byte(const uint8_t* ptr) { return *ptr; }
+
+void copyToRAM(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color) {
+	  int16_t i, j, byteWidth = (w + 7) / 8;
+	  uint8_t byte;
+
+	  for(j=0; j<h; j++) {
+	    for(i=0; i<w; i++) {
+	      if(i & 7) byte <<= 1;
+	      else      byte   = read_byte(bitmap + j * byteWidth + i / 8);
+	      if(byte & 0x80) OLED.drawPixel(x+i, y+j, color);
+	    }
+	  }
 }
 
 void debugRAM() {
@@ -65,7 +128,8 @@ void debugRAM() {
 }
 /*
 ATTEMPTED ADAFRUIT LOGO RECORDED FROM RAM:
-Unfortunately it did NOT show up like this when displayed by the display() function.
+Now shows up, but note the inversion; this is for the Adafruit version where display is flipped horiz.and vertically, I think.
+Low ram corresponds to the left edge of the screen, as if each row were written vertically. Perhaps this is a bug in my debugRAM() function?
 ---
 Pixel RAM contents:
                     ......
