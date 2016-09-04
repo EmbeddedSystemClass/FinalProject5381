@@ -471,6 +471,10 @@ void Adafruit_SSD1306::dim(boolean dim) {
 }
 
 void Adafruit_SSD1306::display(void) {
+#ifdef SPI_HAS_TRANSACTION
+	// this is needed for interleaving with BMPE that uses a different clock speed but same other modes
+    	spi_beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+#endif
 //	  ssd1306_command(SSD1306_MEMORYMODE);                    // 0x20
 //	  ssd1306_command(0x00);                                  // 0x0 act like ks0108
 ////	  ssd1306_command(SSD1306_SEGREMAP | 0x1);
@@ -515,8 +519,9 @@ void Adafruit_SSD1306::display(void) {
     	    digitalWrite(cs, LOW);
     		// send the page mode commands here
     	    fastSPIwrite(0xB0 + (page & 0x07));
-    	    fastSPIwrite(0x00); // reset column to 0 each page (LSNyb)
-    	    fastSPIwrite(0x10); // reset column to 0 each page (MSNyb)
+    	    fastSPIwrite(0x02); // reset column to 2 each page (LSNyb)
+    	    fastSPIwrite(0x10); // reset column to 2 each page (MSNyb)
+    	    // NOTE: Column 2 vs. 0 for displayable area suggested by Sparkfun library; it works, no idea why yet.
     	    page++;
     		// enter data mode
     	    digitalWrite(cs, HIGH);
@@ -558,13 +563,15 @@ void Adafruit_SSD1306::display(void) {
 //    TWBR = twbrbackup;
 //#endif
   }
+#ifdef SPI_HAS_TRANSACTION
+  spi_endTransaction();
+#endif
 }
 
 // clear everything
 void Adafruit_SSD1306::clearDisplay(void) {
   memset(buffer, 0, (SSD1306_LCDWIDTH*SSD1306_LCDHEIGHT/8));
 }
-
 
 inline void Adafruit_SSD1306::fastSPIwrite(uint8_t d) {
 
