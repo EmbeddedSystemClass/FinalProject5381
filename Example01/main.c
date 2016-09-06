@@ -832,11 +832,14 @@ void vTaskOLEDOutput( void* pvParameters ) {
 
 	// OLED setup sequence:
 	// init the display
-	oled_begin(1); // start off with a display reset and register inits
-	vTaskDelay(5000);
-	oled_invertDisplay(1);
-//	vTaskDelay(1000);
-	oled_invertDisplay(0);
+	int hasDevice = oled_begin(1); // start off with a display reset and register inits
+	if (hasDevice) {
+		oled_setDrawMode(DRAWMODE_DEFERRED);
+		oled_setTextColor(NORMAL);
+		vTaskDelay(5000); //leave initial logo up a while
+		oled_clearDisplay();
+		oled_display();
+	}
 
 	int ticker = 0;
 
@@ -848,21 +851,16 @@ void vTaskOLEDOutput( void* pvParameters ) {
 		DisplayResult data;
 		xQueueReceive(xDisplayQueue, &data, portMAX_DELAY);
 
-		switch (ticker & 0x03) {
-		case 0:
-			oled_invertDisplay(1);
-			break;
-		case 1:
-			oled_clearDisplay();
-			break;
-		case 2:
-			oled_invertDisplay(0);
-			break;
-		default:
-			break;
-		}
-		ticker++;
 		// process data with output to OLED multiline display
+		if (hasDevice) {
+			static char buffer[256]; // NEEDED: room for 8 line display of 21 characters each in 5x7 font (6x8 fixed size char.cell)
+			sprintf(buffer, "TEMP(.F): %1.2f,\n (.C): %1.2f\nPRESS(inHg): %1.2f,\n (hPa): %1.2f\nHumidity(%%): %1.2f\nREL.ALT(ft): %1.2f,\n (m): %1.2f\n",
+					FAHR(data.temp), data.temp, INHG(data.press), data.press, data.humid, METERS2FEET(data.altitude), data.altitude);
+			oled_clearDisplay();
+			oled_setCursor(0, 0);
+			oled_print(buffer);
+			oled_display();
+		}
 		DBGOUTXOLED("Temperature(deg.F): %1.2f, (deg.C): %1.2f\nPressure(inHg): %1.2f, (hPa): %1.2f\nHumidity(%%): %1.2f\nRel.Altitude Since Reset(ft): %1.2f, (m): %1.2f\n\n",
 				FAHR(data.temp), data.temp, INHG(data.press), data.press, data.humid, METERS2FEET(data.altitude), data.altitude);
 	}
