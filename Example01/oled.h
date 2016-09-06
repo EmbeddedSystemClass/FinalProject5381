@@ -25,14 +25,43 @@
 #define OLED_RST ((1<<5) | (19))
 #define OLED_CS ((1<<5) | (20))
 
+// these functions will return 0 if no device is found, nonzero otherwise
 EXTERN int oled_init(void);
 EXTERN int oled_begin(int reset);
 
-EXTERN void oled_clearDisplay(void);
-EXTERN void oled_invertDisplay(int i_0_is_normal_1_is_inverted);
-EXTERN void oled_display();
+// control various operation constants of the device
+enum { DRAWMODE_DEFERRED, DRAWMODE_IMMEDIATE };
+EXTERN void  oled_setDrawMode(int new_setting);
+EXTERN int  oled_getDrawMode(void);
+enum { TEXTWRAP_OFF, TEXTWRAP_ON };
+EXTERN void  oled_setTextWrap(int new_setting);
+EXTERN int  oled_getTextWrap(void);
+enum { BLACK, WHITE, INVERT };
+EXTERN void  oled_setGraphicsColor(int new_setting);
+EXTERN int  oled_getGraphicsColor(void);
+enum { NORMAL, INVERTED, NORMAL_OVL, INVERTED_OVL };
+EXTERN void  oled_setTextColor(int new_setting);
+EXTERN int  oled_getTextColor(void);
+// graphics cursor functions
+EXTERN void  oled_setCursor(int x, int y);
+EXTERN int  oled_getCursorX(void);
+EXTERN int  oled_getCursorY(void);
+EXTERN int  oled_getScreenW(void);
+EXTERN int  oled_getScreenH(void);
+//EXTERN void  oled_set(int draw_mode);
+//EXTERN int  oled_get(void);
 
-EXTERN void oled_dim(int dim_1_or_0);
+// drawing functions can operate in deferred mode (into RAM buffer) or immediate to device
+// most operate using current cursor position
+EXTERN void oled_clearDisplay(void);
+EXTERN void oled_drawBitmap(const unsigned char* bitmap_array, unsigned short width_in_bits, unsigned short height_in_bits);
+EXTERN void oled_println(const char* str);
+EXTERN void oled_print(const char* str);
+
+// effects are immediate mode only
+EXTERN void oled_display(void); // immediate xfer graphics buffer to screen in any drawing mode
+EXTERN void oled_invertDisplay(int i_0_is_normal_1_is_inverted);
+//EXTERN void oled_dim(int dim_1_or_0);
 
 #ifdef __cplusplus
 	}

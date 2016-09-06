@@ -52,14 +52,17 @@ const uint8_t himomBitmap[] =
 // Bitmap sizes for himom
 const uint8_t himomWidthPages = 14;
 const uint8_t himomHeightPixels = 22;
+extern const uint8_t font[]; // internal standard 5x7 font
 
 // internal drawing module (replaces Adafruit libraries as C code)
-void setup_int(int16_t w, int16_t h);
+static void setup_defaults(int16_t w, int16_t h);
 static void drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor);
 // text printing module forward references
 static void print(const char str[]);
 static void println(const char str[]);
 static void setCursor(int16_t x, int16_t y);
+static int16_t getCursorX(void);
+static int16_t getCursorY(void);
 static void setTextSize(uint8_t s);
 static void setTextColor(uint16_t c);
 static void setTextColors(uint16_t c, uint16_t b);
@@ -77,7 +80,7 @@ int oled_init(void) {
 	spi_pinConfig(OLED_DC, 0); // use GPIO (func.0)
 	spi_pinConfig(OLED_RST, 0);
 	spi_pinConfig(OLED_CS, 0);
-	setup_int(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+	setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
 	OLED.init(OLED_DC, OLED_RST, OLED_CS);
 	return 0;
 }
@@ -89,28 +92,117 @@ int oled_begin(int reset) {
 	// it then sets up SPI transfer mode and sends a series of commands to the device to initialize it
 	OLED.begin(SSD1306_SWITCHCAPVCC, SSD1306_I2C_ADDRESS, (reset==1), true);
 	OLED.display(); // send RAM buffer to the hardware (initially set up with logo)
-	return 0;
+	return 1;
+}
+
+/// INCLUDE STRING PRINTING SUPPORT FROM GFX LIBRARY AND TRANSLATE TO C
+static int16_t
+    WIDTH, HEIGHT;   // This is the 'raw' display w/h - never changes
+static   int16_t
+    _width, _height, // Display w/h as modified by current rotation
+    cursor_x, cursor_y;
+static   uint16_t
+    textcolor, textbgcolor;
+static   uint8_t
+    textsize,
+	gfxcolor,
+    rotation;
+static   boolean
+    wrap,   // If set, 'wrap' text at right edge of display
+	immediate, // if set, send buffer to display after every graphics call
+    _cp437; // If set, use correct CP437 charset (default is off)
+static   GFXfont
+    *gfxFont;
+
+//enum { DRAWMODE_DEFERRED, DRAWMODE_IMMEDIATE };
+void  oled_setDrawMode(int new_setting) { immediate = (new_setting == 0 ? false : true); }
+int  oled_getDrawMode(void) { return immediate? 1: 0; }
+//enum { TEXTWRAP_OFF, TEXTWRAP_ON };
+void  oled_setTextWrap(int new_setting) { setTextWrap(new_setting == 0 ? false : true); }
+int  oled_getTextWrap(void) { return wrap? 1: 0; }
+//enum { BLACK, WHITE, INVERT };
+void  oled_setGraphicsColor(int new_setting) { gfxcolor = (new_setting); }
+int  oled_getGraphicsColor(void) { return gfxcolor; }
+//enum { NORMAL, INVERTED, NORMAL_OVL, INVERTED_OVL };
+void  oled_setTextColor(int new_setting) {
+	switch (new_setting) {
+	case NORMAL:
+		setTextColors(WHITE, BLACK);
+		break;
+	case INVERTED:
+		setTextColors(BLACK, WHITE);
+		break;
+	case NORMAL_OVL:
+		setTextColor(WHITE); // on transparent
+		break;
+	case INVERTED_OVL:
+		setTextColor(BLACK);
+		break;
+	}
+}
+int  oled_getTextColor(void) {
+	if (textcolor == WHITE && textbgcolor == BLACK)
+		return NORMAL;
+	if (textbgcolor == WHITE && textcolor == BLACK)
+		return INVERTED;
+	if (textcolor == WHITE && textbgcolor == WHITE)
+		return NORMAL_OVL;
+	if (textbgcolor == BLACK && textcolor == BLACK)
+		return INVERTED_OVL;
+	return -1;
+}
+// graphics cursor functions
+void  oled_setCursor(int x, int y) { setCursor(x, y); }
+int  oled_getCursorX(void) { return getCursorX(); }
+int  oled_getCursorY(void) { return getCursorY(); }
+int  oled_getScreenW(void) { return _width; }
+int  oled_getScreenH(void) { return _height; }
+
+void oled_print(const char* str)
+{
+	print(str);
+	if (immediate)
+		OLED.display();
+}
+
+void oled_println(const char* str)
+{
+	println(str);
+	if (immediate)
+		OLED.display();
+}
+
+void oled_display(void) {
+	OLED.display(); // to the hardware
 }
 
 void oled_clearDisplay(void) {
 	OLED.clearDisplay(); // RAM buffer only
-	drawBitmap(10, 20, himomBitmap, himomWidthPages * 8, himomHeightPixels, 1, 0);
-//	OLED.drawCircle(32, 32, 16, 1);
-//	OLED.drawRect(0, 0, 10, 10, 1);
-//	OLED.drawLine(0, 0, 10, 10, 1);
-//	OLED.blastDisplay(himomBitmap, himomWidthPages * himomHeightPixels);
-	setTextSize(1);
-	setTextColors(WHITE, WHITE);
-	setCursor(0,0);
-	println("Hello, Mom!"); // crashes due to C++ virtual function tables not being initialized!
+//	drawBitmap(10, 20, himomBitmap, himomWidthPages * 8, himomHeightPixels, 1, 0);
+////	OLED.drawCircle(32, 32, 16, 1);
+////	OLED.drawRect(0, 0, 10, 10, 1);
+////	OLED.drawLine(0, 0, 10, 10, 1);
+//	setTextSize(1);
+//	setTextColor(WHITE);
+//	setCursor(0,0);
+//	println("Hello, Mom!"); // crashes due to C++ virtual function tables not being initialized!
 
-	OLED.display(); // to the hardware
+	if (immediate)
+		OLED.display(); // to the hardware
 	return;
 }
 
 void oled_invertDisplay(int inverted) {
 	OLED.invertDisplay(inverted);
 	return;
+}
+
+void oled_drawBitmap(const uint8_t* bitmap, int w, int h) {
+	drawBitmap(cursor_x, cursor_y,
+			bitmap, w, h,
+			textcolor, textbgcolor);
+	if (immediate)
+		OLED.display();
 }
 
 static void drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bg) {
@@ -127,24 +219,7 @@ static void drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w
 	  }
 }
 
-/// INCLUDE CLASSIC FONT SUPPORT FROM GFX LIBRARY AND TRANSLATE TO C
-static int16_t
-    WIDTH, HEIGHT;   // This is the 'raw' display w/h - never changes
-static   int16_t
-    _width, _height, // Display w/h as modified by current rotation
-    cursor_x, cursor_y;
-static   uint16_t
-    textcolor, textbgcolor;
-static   uint8_t
-    textsize,
-    rotation;
-static   boolean
-    wrap,   // If set, 'wrap' text at right edge of display
-    _cp437; // If set, use correct CP437 charset (default is off)
-static   GFXfont
-    *gfxFont;
-
-void setup_int(int16_t w, int16_t h)
+static void setup_defaults(int16_t w, int16_t h)
 {
 	WIDTH = w;
 	HEIGHT = h;
@@ -155,8 +230,10 @@ void setup_int(int16_t w, int16_t h)
 	textsize  = 1;
 	textcolor = textbgcolor = 0xFFFF;
 	wrap      = true;
-	_cp437    = false;
+	_cp437    = true; // no need for old behavior
 	gfxFont   = NULL;
+	gfxcolor  = WHITE;
+	immediate = false;
 }
 
 static void setCursor(int16_t x, int16_t y) {
@@ -240,7 +317,6 @@ static void setFont(const GFXfont *f) {
 static uint8_t pgm_read_byte(const void* ptr) { return *(const uint8_t*)ptr; }
 static uint16_t pgm_read_word(const void* ptr) { return *(const uint16_t*)ptr; }
 static void* pgm_read_pointer(void* ptr) { return *(void**)ptr; }
-extern const uint8_t font[];
 
 // Draw a character
 static void drawChar(int16_t x, int16_t y, unsigned char c,
@@ -397,5 +473,5 @@ static void print(const char str[]) {
 
 static void println(const char str[]) {
 	print(str);
-	print("\r\n");
+	print("\n");
 }
