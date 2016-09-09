@@ -74,13 +74,11 @@
 								</option>
 								<option id="gnu.c.link.option.paths.1172120167" name="Library search path (-L)" superClass="gnu.c.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/CMSISv1p30_LPC17xx/Debug}&quot;"/>
-									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/Adafruit_GFX_Displays/Debug}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/FreeRTOS_Library/Debug}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/lpc17xx.cmsis.driver.library/Debug}&quot;"/>
 								</option>
 								<option id="gnu.c.link.option.libs.1681926572" name="Libraries (-l)" superClass="gnu.c.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="CMSISv1p30_LPC17xx"/>
-									<listOptionValue builtIn="false" value="Adafruit_GFX_Displays"/>
 									<listOptionValue builtIn="false" value="FreeRTOS_Library"/>
 									<listOptionValue builtIn="false" value="lpc17xx.cmsis.driver.library"/>
 								</option>
