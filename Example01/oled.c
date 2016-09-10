@@ -17,6 +17,8 @@
 
 static uint8_t gfxcolor = WHITE;
 static boolean immediate = false;
+static boolean displayDimmed = false;
+static int scrolling = SCROLL_STOP;
 
 // set up the pins on the LPC-1769 via the class into the SPI implementation (doesn't work for I2C for now)
 // will return 0 if cannot instantiate the class, 1 if it's good to go
@@ -46,6 +48,8 @@ int  oled_getDrawMode(void) { return immediate? 1: 0; }
 //enum { TEXTWRAP_OFF, TEXTWRAP_ON };
 void  oled_setTextWrap(int new_setting) { gfx_setTextWrap(new_setting == 0 ? false : true); }
 int  oled_getTextWrap(void) { return gfx_getTextWrap()? 1: 0; }
+void  oled_setTextSize(int new_setting) { gfx_setTextSize(new_setting); }
+int  oled_getTextSize(void) { return gfx_getTextSize(); }
 //enum { BLACK, WHITE, INVERT };
 void  oled_setGraphicsColor(int new_setting) { gfxcolor = (new_setting); }
 int  oled_getGraphicsColor(void) { return gfxcolor; }
@@ -114,6 +118,33 @@ void oled_clearDisplay(void) {
 
 void oled_invertDisplay(int inverted) {
 	ssd1306_invertDisplay(inverted);
+	return;
+}
+
+void oled_dim(int dimmed) {
+	displayDimmed = (dimmed? true: false);
+	ssd1306_dim(displayDimmed);
+	return;
+}
+
+void oled_scroll(int type) {
+	// NOTES FROM DATASHEET:
+	// 1. Scrolling disables any display functions (internally)
+	// 2. Stopping the scroll can corrupt device RAM image (resend from here)
+	scrolling = type;
+	switch (scrolling) {
+	case SCROLL_LEFT:
+		ssd1306_startscrollleft(0, 7); // params are page addresses 0-7 for start/stop window area
+		break;
+	case SCROLL_RIGHT:
+		ssd1306_startscrollright(0, 7);
+		break;
+	default:
+	case SCROLL_STOP:
+		ssd1306_stopscroll();
+		oled_display(); // after stop, must redisplay to device RAM again
+		break;
+	}
 	return;
 }
 

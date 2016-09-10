@@ -828,6 +828,12 @@ void vTaskSimple7Output( void *pvParameters )
 #define FAHR(c) ((float)(1.8F * (c) + 32.0F))
 #define INHG(hp) ((float)((hp) / 33.863752577878))
 #define METERS2FEET(m) ((float)((m) * 3.28084))
+
+// define various kinds of tests
+//#define OLEDTEST_SCROLLING
+//#define OLEDTEST_DISPLAY_FX
+//#define OLEDTEST_TEXT_SIZE
+
 void vTaskOLEDOutput( void* pvParameters ) {
 
 	// OLED setup sequence:
@@ -836,12 +842,13 @@ void vTaskOLEDOutput( void* pvParameters ) {
 	if (hasDevice) {
 		oled_setDrawMode(DRAWMODE_DEFERRED);
 		oled_setTextColor(NORMAL);
+		oled_setTextSize(1);
 		vTaskDelay(5000); //leave initial logo up a while
 		oled_clearDisplay();
 		oled_display();
 	}
 
-	int ticker = 0;
+	int testTicker = 0;
 
 	/* As per most tasks, this task is implemented in an infinite loop. */
 
@@ -860,6 +867,39 @@ void vTaskOLEDOutput( void* pvParameters ) {
 			oled_setCursor(0, 0);
 			oled_print(buffer);
 			oled_display();
+#ifdef OLEDTEST_TEXT_SIZE
+			// play with testing text size
+			if ((testTicker % 8) == 0)
+				oled_setTextSize(2);
+			else if ((testTicker % 8) == 2)
+				oled_setTextSize(3);
+			else if ((testTicker % 8) == 4)
+				oled_setTextSize(0);
+			else if ((testTicker % 8) == 6)
+				oled_setTextSize(1);
+#endif
+#ifdef OLEDTEST_DISPLAY_FX
+			// play with testing display effects
+			if ((testTicker % 4) == 0)
+				oled_dim(1);
+			else if ((testTicker % 4) == 2)
+				oled_dim(0);
+			else if ((testTicker % 4) == 1)
+				oled_invertDisplay(1);
+			else if ((testTicker % 4) == 3)
+				oled_invertDisplay(0);
+#endif
+#ifdef OLEDTEST_SCROLLING
+			// play with testing horiz.and vertical scrolling commands
+			// NOTE: These do NOT seem to work on the LANMU knockoff display that I got
+			if ((testTicker % 6) == 0)
+				oled_scroll(SCROLL_STOP);
+			else if ((testTicker % 6) == 2)
+				oled_scroll(SCROLL_LEFT);
+			else if ((testTicker % 6) == 4)
+				oled_scroll(SCROLL_RIGHT);
+#endif
+			++testTicker;
 		}
 		DBGOUTXOLED("Temperature(deg.F): %1.2f, (deg.C): %1.2f\nPressure(inHg): %1.2f, (hPa): %1.2f\nHumidity(%%): %1.2f\nRel.Altitude Since Reset(ft): %1.2f, (m): %1.2f\n\n",
 				FAHR(data.temp), data.temp, INHG(data.press), data.press, data.humid, METERS2FEET(data.altitude), data.altitude);
