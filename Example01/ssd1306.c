@@ -211,12 +211,18 @@ static uint8_t getRotation(void);
 static void setRotation(uint8_t x);
 
 void gfx_setup_defaults(int16_t w, int16_t h) { setup_defaults(w,h); }
+int16_t gfx_getWidth(void) { return getWidth(); }
+int16_t gfx_getHeight(void) { return getHeight(); }
 void gfx_drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor) { drawBitmap(x, y, bitmap, w, h, color, bgcolor); }
 int16_t gfx_getCursorX(void) { return getCursorX(); }
 int16_t gfx_getCursorY(void) { return getCursorY(); }
 void gfx_setCursor(int16_t x, int16_t y) { setCursor(x, y); }
+void gfx_setTextSize(uint8_t s) { setTextSize(s); }
 void gfx_setTextColor(uint16_t c) { setTextColor(c); }
 void gfx_setTextColors(uint16_t c, uint16_t b) { setTextColors(c, b); }
+uint16_t gfx_getTextColor(void) { return getTextColor(); }
+uint16_t gfx_getTextBackgroundColor(void) { return getTextBackgroundColor(); }
+uint8_t gfx_getTextSize(void) { return getTextSize(); }
 void gfx_print(const char str[]) { print(str); }
 void gfx_println(const char str[]) { println(str); }
 
@@ -507,23 +513,23 @@ void ssd1306_command(uint8_t c) {
 
 // startscrollright
 // Activate a right handed scroll for rows start through stop
-// Hint, the display is 16 rows tall. To scroll the whole display, run:
-// display.scrollright(0x00, 0x0F)
+// Hint, the display is 8 pages tall. To scroll the whole display, run:
+// ssd1306_startscrollright(0x00, 0x07)
 void ssd1306_startscrollright(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_RIGHT_HORIZONTAL_SCROLL);
-  ssd1306_command(0X00);
-  ssd1306_command(start);
-  ssd1306_command(0X00);
-  ssd1306_command(stop);
-  ssd1306_command(0X00);
-  ssd1306_command(0XFF);
+  ssd1306_command(0X00); // A: dummy, must be 0
+  ssd1306_command(start); // B: start page 0-7 (bits 7:3 ignored)
+  ssd1306_command(0X00); // C: time delay code 0-7 = N frames/scroll from { 0=5, 1=64, 2=128, 3=256, 4=3, 5=4, 6=64, 7=2 } fps
+  ssd1306_command(stop); // D: end page 0-7 (bits 7:3 ignored)
+  ssd1306_command(0X00); // E: dummy, must be 0
+  ssd1306_command(0XFF); // F: dummy, must be 0xFF
   ssd1306_command(SSD1306_ACTIVATE_SCROLL);
 }
 
 // startscrollleft
 // Activate a right handed scroll for rows start through stop
-// Hint, the display is 16 rows tall. To scroll the whole display, run:
-// display.scrollright(0x00, 0x0F)
+// Hint, the display is 8 pages tall. To scroll the whole display, run:
+// ssd1306_startscrollleft(0x00, 0x07)
 void ssd1306_startscrollleft(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_LEFT_HORIZONTAL_SCROLL);
   ssd1306_command(0X00);
@@ -537,8 +543,8 @@ void ssd1306_startscrollleft(uint8_t start, uint8_t stop){
 
 // startscrolldiagright
 // Activate a diagonal scroll for rows start through stop
-// Hint, the display is 16 rows tall. To scroll the whole display, run:
-// display.scrollright(0x00, 0x0F)
+// Hint, the display is 8 pages tall. To scroll the whole display, run:
+// ssd1306_startscrolldiagright(0x00, 0x07)
 void ssd1306_startscrolldiagright(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_SET_VERTICAL_SCROLL_AREA);
   ssd1306_command(0X00);
@@ -546,16 +552,16 @@ void ssd1306_startscrolldiagright(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_VERTICAL_AND_RIGHT_HORIZONTAL_SCROLL);
   ssd1306_command(0X00);
   ssd1306_command(start);
-  ssd1306_command(0X00);
+  ssd1306_command(0X00); // C: frame rate time code 0-7 (same as horiz.)
   ssd1306_command(stop);
-  ssd1306_command(0X01);
+  ssd1306_command(0X01); // E: 6-bit scroll offset (0=no VScroll, else N rows per scroll) - 0x3f (63) equiv. to -1
   ssd1306_command(SSD1306_ACTIVATE_SCROLL);
 }
 
 // startscrolldiagleft
 // Activate a diagonal scroll for rows start through stop
-// Hint, the display is 16 rows tall. To scroll the whole display, run:
-// display.scrollright(0x00, 0x0F)
+// Hint, the display is 8 pages tall. To scroll the whole display, run:
+// ssd1306_startscrolldiagright(0x00, 0x07)
 void ssd1306_startscrolldiagleft(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_SET_VERTICAL_SCROLL_AREA);
   ssd1306_command(0X00);
@@ -563,9 +569,9 @@ void ssd1306_startscrolldiagleft(uint8_t start, uint8_t stop){
   ssd1306_command(SSD1306_VERTICAL_AND_LEFT_HORIZONTAL_SCROLL);
   ssd1306_command(0X00);
   ssd1306_command(start);
-  ssd1306_command(0X00);
+  ssd1306_command(0X00); // C: frame rate time code 0-7 (same as horiz.)
   ssd1306_command(stop);
-  ssd1306_command(0X01);
+  ssd1306_command(0X01); // E: 6-bit scroll offset (0=no VScroll, else N rows per scroll) - 0x3f (63) equiv. to -1
   ssd1306_command(SSD1306_ACTIVATE_SCROLL);
 }
 
@@ -943,8 +949,9 @@ static void drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w
 	    for(i=0; i<w; i++) {
 	      if(i & 7) byte <<= 1;
 	      else      byte   = bitmap[j * byteWidth + i / 8];
+	      // MLM - attempt to combine the four versions into one: fg==bg implies transparent (no background draw)
 	      if(byte & 0x80) ssd1306_drawPixel(x+i, y+j, color);
-	      else if (bg != -1) ssd1306_drawPixel(x+i, y+j, bg);
+	      else if (bg != color) ssd1306_drawPixel(x+i, y+j, bg);
 	    }
 	  }
 }
@@ -989,6 +996,10 @@ static void setTextSize(uint8_t s) {
   textsize = (s > 0) ? s : 1;
 }
 
+static uint8_t getTextSize(void) {
+  return textsize;
+}
+
 static void setTextColor(uint16_t c) {
   // For 'transparent' background, we'll set the bg
   // to the same as fg instead of using a flag
@@ -1000,8 +1011,20 @@ static void setTextColors(uint16_t c, uint16_t b) {
   textbgcolor = b;
 }
 
+static uint16_t getTextColor(void) {
+  return textcolor;
+}
+
+static uint16_t getTextBackgroundColor(void) {
+  return textbgcolor;
+}
+
 static void setTextWrap(boolean w) {
   wrap = w;
+}
+
+static boolean getTextWrap(void) {
+  return wrap;
 }
 
 static uint8_t getRotation(void) {
