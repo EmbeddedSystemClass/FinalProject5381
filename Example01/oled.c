@@ -25,7 +25,7 @@ static int scrolling = SCROLL_STOP;
 int oled_init(void) {
 	gfxcolor  = WHITE;
 	immediate = false;
-	gfx_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+	ssd1306_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
 	ssd1306_init_hwspi(OLED_DC, OLED_RST, OLED_CS);
 	return 0;
 }
@@ -37,7 +37,7 @@ int oled_begin(int reset) {
 	// it then sets up SPI transfer mode and sends a series of commands to the device to initialize it
 	ssd1306_begin(SSD1306_SWITCHCAPVCC, SSD1306_I2C_ADDRESS, (reset==1), true);
 	ssd1306_clearDisplay();
-	gfx_drawBitmap(0, 0, logoBitmap, logoWidthPages * 8, logoHeightPixels, 1, 0);
+	ssd1306_drawBitmap(0, 0, logoBitmap, logoWidthPages * 8, logoHeightPixels, 1, 0);
 	ssd1306_display(); // send RAM buffer to the hardware (initially set up with logo)
 	return 1;
 }
@@ -46,10 +46,10 @@ int oled_begin(int reset) {
 void  oled_setDrawMode(int new_setting) { immediate = (new_setting == 0 ? false : true); }
 int  oled_getDrawMode(void) { return immediate? 1: 0; }
 //enum { TEXTWRAP_OFF, TEXTWRAP_ON };
-void  oled_setTextWrap(int new_setting) { gfx_setTextWrap(new_setting == 0 ? false : true); }
-int  oled_getTextWrap(void) { return gfx_getTextWrap()? 1: 0; }
-void  oled_setTextSize(int new_setting) { gfx_setTextSize(new_setting); }
-int  oled_getTextSize(void) { return gfx_getTextSize(); }
+void  oled_setTextWrap(int new_setting) { ssd1306_setTextWrap(new_setting == 0 ? false : true); }
+int  oled_getTextWrap(void) { return ssd1306_getTextWrap()? 1: 0; }
+void  oled_setTextSize(int new_setting) { ssd1306_setTextSize(new_setting); }
+int  oled_getTextSize(void) { return ssd1306_getTextSize(); }
 //enum { BLACK, WHITE, INVERT };
 void  oled_setGraphicsColor(int new_setting) { gfxcolor = (new_setting); }
 int  oled_getGraphicsColor(void) { return gfxcolor; }
@@ -57,22 +57,22 @@ int  oled_getGraphicsColor(void) { return gfxcolor; }
 void  oled_setTextColor(int new_setting) {
 	switch (new_setting) {
 	case NORMAL:
-		gfx_setTextColors(WHITE, BLACK);
+		ssd1306_setTextColors(WHITE, BLACK);
 		break;
 	case INVERTED:
-		gfx_setTextColors(BLACK, WHITE);
+		ssd1306_setTextColors(BLACK, WHITE);
 		break;
 	case NORMAL_OVL:
-		gfx_setTextColor(WHITE); // on transparent
+		ssd1306_setTextColor(WHITE); // on transparent
 		break;
 	case INVERTED_OVL:
-		gfx_setTextColor(BLACK);
+		ssd1306_setTextColor(BLACK);
 		break;
 	}
 }
 int  oled_getTextColor(void) {
-	int textcolor = gfx_getTextColor();
-	int textbgcolor = gfx_getTextBackgroundColor();
+	int textcolor = ssd1306_getTextColor();
+	int textbgcolor = ssd1306_getTextBackgroundColor();
 	if (textcolor == WHITE && textbgcolor == BLACK)
 		return NORMAL;
 	if (textbgcolor == WHITE && textcolor == BLACK)
@@ -84,22 +84,22 @@ int  oled_getTextColor(void) {
 	return -1;
 }
 // graphics cursor functions
-void  oled_setCursor(int x, int y) { gfx_setCursor(x, y); }
-int  oled_getCursorX(void) { return gfx_getCursorX(); }
-int  oled_getCursorY(void) { return gfx_getCursorY(); }
-int  oled_getScreenW(void) { return gfx_getWidth(); }
-int  oled_getScreenH(void) { return gfx_getHeight(); }
+void  oled_setCursor(int x, int y) { ssd1306_setCursor(x, y); }
+int  oled_getCursorX(void) { return ssd1306_getCursorX(); }
+int  oled_getCursorY(void) { return ssd1306_getCursorY(); }
+int  oled_getScreenW(void) { return ssd1306_getWidth(); }
+int  oled_getScreenH(void) { return ssd1306_getHeight(); }
 
 void oled_print(const char* str)
 {
-	gfx_print(str);
+	ssd1306_print(str);
 	if (immediate)
 		ssd1306_display();
 }
 
 void oled_println(const char* str)
 {
-	gfx_println(str);
+	ssd1306_println(str);
 	if (immediate)
 		ssd1306_display();
 }
@@ -149,9 +149,25 @@ void oled_scroll(int type) {
 }
 
 void oled_drawBitmap(const uint8_t* bitmap, unsigned short w, unsigned short h) {
-	gfx_drawBitmap(gfx_getCursorX(), gfx_getCursorY(),
+	ssd1306_drawBitmap(ssd1306_getCursorX(), ssd1306_getCursorY(),
 			bitmap, w, h,
-			gfx_getTextColor(), gfx_getTextBackgroundColor());
+			ssd1306_getTextColor(), ssd1306_getTextBackgroundColor());
+	if (immediate)
+		ssd1306_display();
+}
+
+void oled_drawCircleAt(int x, int y, int radius, int color, int filled) {
+	if (filled)
+		ssd1306_fillCircle(x, y, radius, color);
+	else
+		ssd1306_drawCircle(x, y, radius, color);
+	if (immediate)
+		ssd1306_display();
+}
+
+void oled_drawLineTo(int x, int y, int color) {
+	ssd1306_drawLine(ssd1306_getCursorX(), ssd1306_getCursorY(), x, y, color);
+	ssd1306_setCursor(x,y);
 	if (immediate)
 		ssd1306_display();
 }

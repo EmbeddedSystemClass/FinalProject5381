@@ -833,6 +833,7 @@ void vTaskSimple7Output( void *pvParameters )
 //#define OLEDTEST_SCROLLING
 //#define OLEDTEST_DISPLAY_FX
 //#define OLEDTEST_TEXT_SIZE
+#define OLEDTEST_CIRCLES
 
 void vTaskOLEDOutput( void* pvParameters ) {
 
@@ -866,6 +867,18 @@ void vTaskOLEDOutput( void* pvParameters ) {
 			oled_clearDisplay();
 			oled_setCursor(0, 0);
 			oled_print(buffer);
+#ifdef OLEDTEST_CIRCLES
+			if ((testTicker % 8) < 2) {
+				oled_drawCircleAt(10, 10, 10, WHITE, 0);
+				oled_drawCircleAt(100, 50, 10, WHITE, 0);
+			} else if ((testTicker % 8) < 4) {
+				oled_drawCircleAt(50, 30, 30, INVERT, 0);
+				oled_drawCircleAt(10, 60, 10, WHITE, 1);
+			} else if ((testTicker % 8) < 6) {
+				oled_drawCircleAt(100, 50, 10, WHITE, 1);
+				oled_drawCircleAt(50, 50, 20, INVERT, 1);
+			}
+#endif
 			oled_display();
 #ifdef OLEDTEST_TEXT_SIZE
 			// play with testing text size

@@ -59,6 +59,8 @@ EXTERN void oled_clearDisplay(void);
 EXTERN void oled_drawBitmap(const unsigned char* bitmap_array, unsigned short width_in_bits, unsigned short height_in_bits);
 EXTERN void oled_println(const char* str);
 EXTERN void oled_print(const char* str);
+EXTERN void oled_drawCircleAt(int x, int y, int radius, int color, int filled);
+EXTERN void oled_drawLineTo(int x, int y, int color); // from current cursor, which updates to "to" location afterwards
 
 // effects are immediate mode only
 EXTERN void oled_display(void); // immediate xfer graphics buffer to screen in any drawing mode

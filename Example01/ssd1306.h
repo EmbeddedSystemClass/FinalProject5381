@@ -63,26 +63,35 @@ typedef bool boolean;
 #define SSD1306_SWITCHCAPVCC 0x2
 
 // graphics forward references
-extern void gfx_setup_defaults(int16_t w, int16_t h);
-extern int16_t gfx_getHeight(void);
-extern int16_t gfx_getWidth(void);
-extern void gfx_setCursor(int16_t x, int16_t y);
-extern int16_t gfx_getCursorX(void);
-extern int16_t gfx_getCursorY(void);
-extern void gfx_drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor);
+extern void ssd1306_setup_defaults(int16_t w, int16_t h);
+extern int16_t ssd1306_getHeight(void);
+extern int16_t ssd1306_getWidth(void);
+extern void ssd1306_setCursor(int16_t x, int16_t y);
+extern int16_t ssd1306_getCursorX(void);
+extern int16_t ssd1306_getCursorY(void);
+extern void ssd1306_drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor);
+extern void ssd1306_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+extern void ssd1306_drawFastVLine(int16_t x0, int16_t y0, int16_t width, uint16_t color);
+extern void ssd1306_drawFastHLine(int16_t x0, int16_t y0, int16_t height, uint16_t color);
+extern void ssd1306_drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+extern void ssd1306_fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+extern void ssd1306_drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+extern void ssd1306_fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+extern void ssd1306_drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+extern void ssd1306_fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
 // text printing forward references
-extern void gfx_print(const char str[]);
-extern void gfx_println(const char str[]);
-extern void gfx_setTextSize(uint8_t s);
-extern uint8_t gfx_getTextSize(void);
-extern void gfx_setTextColor(uint16_t c);
-extern void gfx_setTextColors(uint16_t c, uint16_t b);
-extern uint16_t gfx_getTextColor(void);
-extern uint16_t gfx_getTextBackgroundColor(void);
-extern void gfx_setTextWrap(bool w);
-extern bool gfx_getTextWrap(void);
-extern uint8_t gfx_getRotation(void);
-extern void gfx_setRotation(uint8_t x);
+extern void ssd1306_print(const char str[]);
+extern void ssd1306_println(const char str[]);
+extern void ssd1306_setTextSize(uint8_t s);
+extern uint8_t ssd1306_getTextSize(void);
+extern void ssd1306_setTextColor(uint16_t c);
+extern void ssd1306_setTextColors(uint16_t c, uint16_t b);
+extern uint16_t ssd1306_getTextColor(void);
+extern uint16_t ssd1306_getTextBackgroundColor(void);
+extern void ssd1306_setTextWrap(bool w);
+extern bool ssd1306_getTextWrap(void);
+extern uint8_t ssd1306_getRotation(void);
+extern void ssd1306_setRotation(uint8_t x);
 
 // internal drawing module (replaces Adafruit libraries as C code)
 extern void ssd1306_init_swspi(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS); // SW SPI

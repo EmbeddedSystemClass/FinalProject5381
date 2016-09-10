@@ -179,8 +179,8 @@ static  boolean hwSPI;
 #endif
 
 // "virtual" function forward references
-static void ssd1306_drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
-static void ssd1306_drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
+static void ssd1306_drawFastVLineVirtual(int16_t x, int16_t y, int16_t h, uint16_t color);
+static void ssd1306_drawFastHLineVirtual(int16_t x, int16_t y, int16_t w, uint16_t color);
 static void ssd1306_fastSPIwrite(uint8_t c);
 static inline void ssd1306_drawFastVLineInternal(int16_t x, int16_t y, int16_t h, uint16_t color) __attribute__((always_inline));
 static inline void ssd1306_drawFastHLineInternal(int16_t x, int16_t y, int16_t w, uint16_t color) __attribute__((always_inline));
@@ -210,27 +210,45 @@ static bool getTextWrap(void);
 static uint8_t getRotation(void);
 static void setRotation(uint8_t x);
 
-void gfx_setup_defaults(int16_t w, int16_t h) { setup_defaults(w,h); }
-int16_t gfx_getWidth(void) { return getWidth(); }
-int16_t gfx_getHeight(void) { return getHeight(); }
-void gfx_drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor) { drawBitmap(x, y, bitmap, w, h, color, bgcolor); }
-int16_t gfx_getCursorX(void) { return getCursorX(); }
-int16_t gfx_getCursorY(void) { return getCursorY(); }
-void gfx_setCursor(int16_t x, int16_t y) { setCursor(x, y); }
-void gfx_setTextSize(uint8_t s) { setTextSize(s); }
-void gfx_setTextColor(uint16_t c) { setTextColor(c); }
-void gfx_setTextColors(uint16_t c, uint16_t b) { setTextColors(c, b); }
-uint16_t gfx_getTextColor(void) { return getTextColor(); }
-uint16_t gfx_getTextBackgroundColor(void) { return getTextBackgroundColor(); }
-uint8_t gfx_getTextSize(void) { return getTextSize(); }
-void gfx_print(const char str[]) { print(str); }
-void gfx_println(const char str[]) { println(str); }
-
 // forward references for GFX library translation
-void fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
-		 uint16_t color);
-void fillCircleHelper(int16_t x0, int16_t y0, int16_t r,
-		 uint8_t cornername, int16_t delta, uint16_t color);
+static void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
+static void drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+static void drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
+static void drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
+static void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+static void fillScreen(uint16_t color);
+static void drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+static void fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
+static void drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color);
+static void fillRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color);
+static void drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+static void fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color);
+
+// basic GFX implementations (forward to their static counterparts)
+void ssd1306_setup_defaults(int16_t w, int16_t h) { setup_defaults(w,h); }
+int16_t ssd1306_getWidth(void) { return getWidth(); }
+int16_t ssd1306_getHeight(void) { return getHeight(); }
+void ssd1306_drawBitmap(uint16_t x, uint16_t y, const uint8_t* bitmap, uint16_t w, uint16_t h, uint16_t color, uint16_t bgcolor) { drawBitmap(x, y, bitmap, w, h, color, bgcolor); }
+int16_t ssd1306_getCursorX(void) { return getCursorX(); }
+int16_t ssd1306_getCursorY(void) { return getCursorY(); }
+void ssd1306_setCursor(int16_t x, int16_t y) { setCursor(x, y); }
+void ssd1306_setTextSize(uint8_t s) { setTextSize(s); }
+void ssd1306_setTextColor(uint16_t c) { setTextColor(c); }
+void ssd1306_setTextColors(uint16_t c, uint16_t b) { setTextColors(c, b); }
+uint16_t ssd1306_getTextColor(void) { return getTextColor(); }
+uint16_t ssd1306_getTextBackgroundColor(void) { return getTextBackgroundColor(); }
+uint8_t ssd1306_getTextSize(void) { return getTextSize(); }
+void ssd1306_print(const char str[]) { print(str); }
+void ssd1306_println(const char str[]) { println(str); }
+void ssd1306_drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color) { drawLine(x0,y0,x1,y1,color); }
+void ssd1306_drawFastVLine(int16_t x0, int16_t y0, int16_t width, uint16_t color) { ssd1306_drawFastVLineVirtual(x0,y0,width,color); }
+void ssd1306_drawFastHLine(int16_t x0, int16_t y0, int16_t height, uint16_t color) { ssd1306_drawFastHLineVirtual(x0,y0,height,color); }
+void ssd1306_drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) { drawRect(x,y,w,h,color); }
+void ssd1306_fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color) { fillRect(x,y,w,h,color); }
+void ssd1306_drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color) { drawCircle(x0,y0,r,color); }
+void ssd1306_fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color) { fillCircle(x0,y0,r,color); }
+void ssd1306_drawTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) { drawTriangle(x0,y0,x1,y1,x2,y2,color); }
+void ssd1306_fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) { fillTriangle(x0,y0,x1,y1,x2,y2,color); }
 
 // the most basic function, set a single pixel
 void ssd1306_drawPixel(int16_t x, int16_t y, uint16_t color) {
@@ -266,7 +284,7 @@ void ssd1306_drawPixel(int16_t x, int16_t y, uint16_t color) {
 // MLM DEBUG - get a single pixel bit (0/1) or -1 if params out of range
 int ssd1306_getPixel(int16_t x, int16_t y)
 {
-  if ((x < 0) || (x >= gfx_getWidth()) || (y < 0) || (y >= gfx_getHeight()))
+  if ((x < 0) || (x >= ssd1306_getWidth()) || (y < 0) || (y >= ssd1306_getHeight()))
     return -1;
 
   // check rotation, move pixel around if necessary
@@ -304,7 +322,7 @@ void ssd1306_init_swspi(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t C
   sid = SID;
   hwSPI = false;
   // run the in-place ctor of the base class again? TOTAL KLUDGE! but should work here for testing
-  gfx_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+  ssd1306_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
 	// set up the I/O pins on the LPC board via CMSIS
 	// NOTE: assumes SPI0 is already set up for device sharing, so we only need to add these 3 pins to the mix
 	spi_pinConfig(DC, 0); // use GPIO (func.0)
@@ -325,7 +343,7 @@ void ssd1306_init_i2c(int8_t reset) {
   sclk = dc = cs = sid = -1;
   rst = reset;
   // run the in-place ctor of the base class again? TOTAL KLUDGE! but should work here for testing
-  gfx_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+  ssd1306_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
 	// set up the I/O pins on the LPC board via CMSIS
 	// NOTE: assumes SPI0 is already set up for device sharing, so we only need to add these 3 pins to the mix
 	spi_pinConfig(rst, 0);
@@ -340,7 +358,7 @@ void ssd1306_init_hwspi(int8_t DC, int8_t RST, int8_t CS) {
   cs = CS;
   hwSPI = true;
   // run the in-place ctor of the base class again? TOTAL KLUDGE! but should work here for testing
-  gfx_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
+  ssd1306_setup_defaults(SSD1306_LCDWIDTH, SSD1306_LCDHEIGHT);
 	// set up the I/O pins on the LPC board via CMSIS
 	// NOTE: assumes SPI0 is already set up for device sharing, so we only need to add these 3 pins to the mix
 	spi_pinConfig(DC, 0); // use GPIO (func.0)
@@ -724,7 +742,7 @@ static inline void ssd1306_fastSPIwrite(uint8_t d) {
   }
 }
 
-static void ssd1306_drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) {
+static void ssd1306_drawFastHLineVirtual(int16_t x, int16_t y, int16_t w, uint16_t color) {
   boolean bSwap = false;
   switch(rotation) {
     case 0:
@@ -793,7 +811,7 @@ static void ssd1306_drawFastHLineInternal(int16_t x, int16_t y, int16_t w, uint1
   }
 }
 
-static void ssd1306_drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color) {
+static void ssd1306_drawFastVLineVirtual(int16_t x, int16_t y, int16_t h, uint16_t color) {
   bool bSwap = false;
   switch(rotation) {
     case 0:
@@ -1231,15 +1249,20 @@ static void println(const char str[]) {
 	print("\n");
 }
 
-// virtual function simulation for C
+// virtual function simulation for C (GFX library uses these from SSD1306 library)
 #define _swap_int16_t ssd1306_swap
 #define drawPixel(x,y,c) ssd1306_drawPixel(x,y,c)
-//#define drawFastVLine(x, y, h, c) ssd1306_drawFastVLine(x, y, h, c)
-//#define drawFastHLine(x, y, w, c) ssd1306_drawFastHLine(x, y, w, c)
+#define drawFastVLine(x,y,h,c) ssd1306_drawFastVLine(x,y,h,c)
+#define drawFastHLine(x,y,w,c) ssd1306_drawFastHLine(x,y,w,c)
+// misc. private forward references
+static void drawCircleHelper( int16_t x0, int16_t y0,
+ int16_t r, uint8_t cornername, uint16_t color);
+static void fillCircleHelper(int16_t x0, int16_t y0, int16_t r,
+ uint8_t cornername, int16_t delta, uint16_t color);
 
 // Draw a circle outline
-void drawCircle(int16_t x0, int16_t y0, int16_t r,
- uint16_t color) {
+static void drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color)
+{
   int16_t f = 1 - r;
   int16_t ddF_x = 1;
   int16_t ddF_y = -2 * r;
@@ -1272,7 +1295,7 @@ void drawCircle(int16_t x0, int16_t y0, int16_t r,
   }
 }
 
-void drawCircleHelper( int16_t x0, int16_t y0,
+static void drawCircleHelper( int16_t x0, int16_t y0,
  int16_t r, uint8_t cornername, uint16_t color) {
   int16_t f     = 1 - r;
   int16_t ddF_x = 1;
@@ -1308,14 +1331,14 @@ void drawCircleHelper( int16_t x0, int16_t y0,
   }
 }
 
-void fillCircle(int16_t x0, int16_t y0, int16_t r,
+static void fillCircle(int16_t x0, int16_t y0, int16_t r,
  uint16_t color) {
   ssd1306_drawFastVLine(x0, y0-r, 2*r+1, color);
   fillCircleHelper(x0, y0, r, 3, 0, color);
 }
 
 // Used to do circles and roundrects
-void fillCircleHelper(int16_t x0, int16_t y0, int16_t r,
+static void fillCircleHelper(int16_t x0, int16_t y0, int16_t r,
  uint8_t cornername, int16_t delta, uint16_t color) {
 
   int16_t f     = 1 - r;
@@ -1346,7 +1369,7 @@ void fillCircleHelper(int16_t x0, int16_t y0, int16_t r,
 }
 
 // Bresenham's algorithm - thx wikpedia
-void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
+static void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
  uint16_t color) {
   int16_t steep = abs(y1 - y0) > abs(x1 - x0);
   if (steep) {
@@ -1387,7 +1410,7 @@ void drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
 }
 
 // Draw a rectangle
-void drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
+static void drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
  uint16_t color) {
 	ssd1306_drawFastHLine(x, y, w, color);
 	ssd1306_drawFastHLine(x, y+h-1, w, color);
@@ -1395,19 +1418,22 @@ void drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
 	ssd1306_drawFastVLine(x+w-1, y, h, color);
 }
 
-void drawFastVLine(int16_t x, int16_t y,
- int16_t h, uint16_t color) {
-  // Update in subclasses if desired!
-  drawLine(x, y, x, y+h-1, color);
-}
+//// NOTE: this generic implementation was replaced by the ssd1306_*() versions
+//static void drawFastVLine(int16_t x, int16_t y,
+// int16_t h, uint16_t color) {
+//  // Update in subclasses if desired!
+//  drawLine(x, y, x, y+h-1, color);
+//  ssd1306_drawFastVLine(x, y, h, color);
+//}
+//
+//// NOTE: this generic implementation was replaced by the ssd1306_*() versions
+//static void drawFastHLine(int16_t x, int16_t y,
+// int16_t w, uint16_t color) {
+//  // Update in subclasses if desired!
+//  drawLine(x, y, x+w-1, y, color);
+//}
 
-void drawFastHLine(int16_t x, int16_t y,
- int16_t w, uint16_t color) {
-  // Update in subclasses if desired!
-  drawLine(x, y, x+w-1, y, color);
-}
-
-void fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
+static void fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
  uint16_t color) {
   // Update in subclasses if desired!
   for (int16_t i=x; i<x+w; i++) {
@@ -1415,12 +1441,12 @@ void fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
   }
 }
 
-void fillScreen(uint16_t color) {
+static void fillScreen(uint16_t color) {
   fillRect(0, 0, _width, _height, color);
 }
 
 // Draw a rounded rectangle
-void drawRoundRect(int16_t x, int16_t y, int16_t w,
+static void drawRoundRect(int16_t x, int16_t y, int16_t w,
  int16_t h, int16_t r, uint16_t color) {
   // smarter version
 	ssd1306_drawFastHLine(x+r  , y    , w-2*r, color); // Top
@@ -1435,7 +1461,7 @@ void drawRoundRect(int16_t x, int16_t y, int16_t w,
 }
 
 // Fill a rounded rectangle
-void fillRoundRect(int16_t x, int16_t y, int16_t w,
+static void fillRoundRect(int16_t x, int16_t y, int16_t w,
  int16_t h, int16_t r, uint16_t color) {
   // smarter version
   fillRect(x+r, y, w-2*r, h, color);
@@ -1446,7 +1472,7 @@ void fillRoundRect(int16_t x, int16_t y, int16_t w,
 }
 
 // Draw a triangle
-void drawTriangle(int16_t x0, int16_t y0,
+static void drawTriangle(int16_t x0, int16_t y0,
  int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
   drawLine(x0, y0, x1, y1, color);
   drawLine(x1, y1, x2, y2, color);
@@ -1454,7 +1480,7 @@ void drawTriangle(int16_t x0, int16_t y0,
 }
 
 // Fill a triangle
-void fillTriangle(int16_t x0, int16_t y0,
+static void fillTriangle(int16_t x0, int16_t y0,
  int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color) {
 
   int16_t a, b, y, last;
