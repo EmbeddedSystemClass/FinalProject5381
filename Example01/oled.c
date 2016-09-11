@@ -87,8 +87,8 @@ int  oled_getTextColor(void) {
 void  oled_setCursor(int x, int y) { ssd1306_setCursor(x, y); }
 int  oled_getCursorX(void) { return ssd1306_getCursorX(); }
 int  oled_getCursorY(void) { return ssd1306_getCursorY(); }
-int  oled_getScreenW(void) { return ssd1306_getWidth(); }
-int  oled_getScreenH(void) { return ssd1306_getHeight(); }
+int  oled_getWidth(void) { return ssd1306_getWidth(); }
+int  oled_getHeight(void) { return ssd1306_getHeight(); }
 
 void oled_print(const char* str)
 {

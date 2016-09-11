@@ -48,8 +48,8 @@ EXTERN int  oled_getTextSize(void);
 EXTERN void  oled_setCursor(int x, int y);
 EXTERN int  oled_getCursorX(void);
 EXTERN int  oled_getCursorY(void);
-EXTERN int  oled_getScreenW(void);
-EXTERN int  oled_getScreenH(void);
+EXTERN int  oled_getWidth(void);
+EXTERN int  oled_getHeight(void);
 //EXTERN void  oled_set(int new_setting);
 //EXTERN int  oled_get(void);
 

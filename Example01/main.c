@@ -833,7 +833,22 @@ void vTaskSimple7Output( void *pvParameters )
 //#define OLEDTEST_SCROLLING
 //#define OLEDTEST_DISPLAY_FX
 //#define OLEDTEST_TEXT_SIZE
-#define OLEDTEST_CIRCLES
+//#define OLEDTEST_CIRCLES
+#define OLEDTEST_POLYGONS
+
+void drawTestPolygon(int fromX, int fromY, int w, int h, int color) {
+	int x0 = fromX, y0 = fromY;
+	int x1 = x0 + w/2, y1 = y0 + h;
+	int x2 = x0 + w;
+	oled_setCursor(x0, y0);
+	oled_drawLineTo(x1,y1,color);
+	oled_drawLineTo(x0,y1,color);
+	oled_drawLineTo(x1,y0,color);
+	oled_drawLineTo(x2,y1,color);
+	oled_drawLineTo(x1,y1,color);
+	oled_drawLineTo(x2,y0,color);
+	oled_drawLineTo(x0,y0,color);
+}
 
 void vTaskOLEDOutput( void* pvParameters ) {
 
@@ -877,6 +892,17 @@ void vTaskOLEDOutput( void* pvParameters ) {
 			} else if ((testTicker % 8) < 6) {
 				oled_drawCircleAt(100, 50, 10, WHITE, 1);
 				oled_drawCircleAt(50, 50, 20, INVERT, 1);
+			}
+#endif
+#ifdef OLEDTEST_POLYGONS
+			if ((testTicker % 8) < 2) {
+				drawTestPolygon(1, 1, oled_getWidth() - 2, oled_getHeight() - 2, WHITE);
+			} else if ((testTicker % 8) < 4) {
+				oled_clearDisplay();
+				drawTestPolygon(1, 1, oled_getWidth()/2 - 2, oled_getHeight() - 2, WHITE);
+			} else if ((testTicker % 8) < 6) {
+				oled_clearDisplay();
+				drawTestPolygon(oled_getWidth()/2, 1, oled_getWidth()/2 - 1, oled_getHeight() - 2, WHITE);
 			}
 #endif
 			oled_display();
