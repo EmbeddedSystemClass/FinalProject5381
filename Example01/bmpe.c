@@ -92,6 +92,8 @@
 
           BMP280_REGISTER_CAL26              = 0xE1,  // R calibration stored in 0xE1-0xF0
 
+          BMP280_REGISTER_STATUS             = 0xF3,
+
           BMP280_REGISTER_CONTROL            = 0xF4,
           BMP280_REGISTER_CONFIG             = 0xF5,
           BMP280_REGISTER_PRESSUREDATA       = 0xF7,
@@ -166,6 +168,8 @@
 
                   BME280_REGISTER_CAL26              = 0xE1,  // R calibration stored in 0xE1-0xF0
 
+		          BME280_REGISTER_STATUS             = BMP280_REGISTER_STATUS,
+
                   BME280_REGISTER_CONTROLHUMID       = 0xF2,
                   BME280_REGISTER_CONTROL            = BMP280_REGISTER_CONTROL     ,
                   BME280_REGISTER_CONFIG             = BMP280_REGISTER_CONFIG      ,
@@ -217,7 +221,8 @@
 		NORMAL, // samples are created automatically as above, no filtering (Arduino compatible mode)
 		FORCED,  // must request every sample (not really supported)
     };
-    int forcedMode = FILTERED;
+    int operatingMode = FILTERED;
+    byte regValueConfig=0x00, regValueControl=0x00, regValueControlH=0x00;
 
     int8_t _cs, _mosi, _miso, _sck;
 
@@ -267,20 +272,19 @@
       readCoefficients();
 
       // set config and control registers (incl.control for humidity if needed)
-      byte regValueConfig=0x00, regValueControl=0x00, regValueControlH=0x00;
-      if (forcedMode == NORMAL) {
+      if (operatingMode == NORMAL) {
     	  // OLD WAY OF "FORCED MODE"; I was actually using oversampled NORMAL mode w/o the filtering
     	  if (bmpe_hasHumidity())
     		  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
     	  regValueConfig = (0x0 << 5) + (0x0 << 2) + (0x0 << 0); //0x00// reset value is 000 000 00b (fast Tstandby, no filter, no 3-wire SPI)
 		  regValueControl = (0x1 << 5) + (0x7 << 2) + (0x3 << 0); //0x3F// 001 111 11b Temp.1x, Press.16x, NORMAL mode (oops!)
-      } else if (forcedMode == FORCED) {
+      } else if (operatingMode == FORCED) {
 		  // BMP: Forced mode xfers (one at a time, no filter)
 		  //Set before CONTROL_meas (DS 5.4.3)
     	  if (bmpe_hasHumidity())
     		  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
     	  regValueConfig = (0x0 << 5) + (0x0 << 2) + (0x0 << 0); //0x00// reset value is 000 000 00b (no filter, fast Tstandby, no 3-wire SPI)
-    	  regValueControl = (0x1 << 5) + (0x1 << 2) + (0x1 << 0); //0x25// 001 001 01b Temp.1x, Press.1x, FORCED mode
+    	  regValueControl = (0x1 << 5) + (0x1 << 2) + (0x0 << 0); //0x25// 001 001 01b Temp.1x, Press.1x, SLEEP mode
 		  // NOTE: actual use of this requires resending the forced mode control byte EVERY TIME A SAMPLE IS DESIRED (reverts to sleep mode after completion)
 		  // This would also imply reading the status register to wait for completion of that sample.
       } else {
@@ -301,7 +305,7 @@
     	   */
 		  //Set before CONTROL_meas (DS 5.4.3)
     	  if (bmpe_hasHumidity())
-        	  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 20-bit data to MSBIT (0x80000)
+        	  regValueControlH = (1 << 0); // humid 1x sampling (reset value is SKIP/0, sets 16-bit data to MSBIT (0x8000)
 		  regValueConfig = (0x0 << 5) + (0x2 << 2) + (0x0 << 0); //0x08//000(Tsb) 010(F) 00(3W)// fastest sampling/lowest Tstandby, 4x.filtering, no 3-wire SPI
 		  regValueControl = (0x2 << 5) + (0x5 << 2) + (0x3 << 0); //0x57//010(T) 101(P) 11(M)// 16x oversampling Press, 2x ovs.on Temp, normal mode
 		  // NOTE: in NORMAL mode, register writes are disabled until SLEEP mode is sent
@@ -315,6 +319,21 @@
 	  showTimingParameters(regValueConfig, regValueControl, regValueControlH, bmpe_hasHumidity());
 
       return bmpe_hasHumidity()? BMPE_BMETYPE: BMPE_BMPTYPE;
+    }
+
+    void bmpe_measureForcedMode() {
+    	// send the control byte with mode bits 1:0 set to b01 (FORCED)
+  	  write8(BME280_REGISTER_CONTROL, regValueControl | 0x01);
+    	// wait for status byte to return OK
+  	  byte mask = (1 << 3) | (1 << 0); // two status bits, for NVM copying and for conversion, both must be 0 in ready state
+  	  // NOTE: hopefully the state transitions of the two bits are 8 >> 1 >> 0 - if there is an intermediate 0, we will have a false done signal and need two loops
+  	  while ((read8(BME280_REGISTER_STATUS) & mask) != 0x00)
+  		  ;
+    	// DEBUG: check humidity data - why is it always 0 in burst mode?
+  	  byte humidL = read8(BME280_REGISTER_HUMIDDATA);
+  	  byte humidH = read8(BME280_REGISTER_HUMIDDATA + 1);
+  	  int humid = (humidH << 8) + humidL;
+      DBGOUT("bmpeRdH8(r%02x):%02x %02x = %04x(%d)\n", BME280_REGISTER_HUMIDDATA, (int)(humidH), (int)(humidL), humid, humid);
     }
 
 // ORIGINAL ADAFRUIT LIBRARIES ARE ON GITHUB AT:
@@ -468,11 +487,12 @@
     /**************************************************************************/
     /*!
         @brief  Reads all uncompensated data values over SPI in burst mode (one read command)
+        ORDER: P(3r) - T(3r) - H(2r)
         Allowed values for length:
-        3 = equivalent to read24(), assembles 1st value from 3 regs
-        6 = assembles and returns 1st two values (3 regs.each)
-        8 = assembles and returns 3 values (3+3+2 regs)
-        9 = assembles and returns 3 full values (3+3+3 regs - not really used tho)
+        3 = equivalent to read24(), assembles 1st value from 3 regs (separate P, T, or H)
+        5 = assembles and returns 1st two values (3 regs. + 2 regs.) (T+H)
+        6 = assembles and returns 1st two values (3 regs.each) (P+T)
+        8 = assembles and returns all 3 values (3+3+2 regs) (P+T+H)
     */
     /**************************************************************************/
 
@@ -504,8 +524,10 @@
           value2 = spixfer(0);
           value2 <<= 8;
           value2 |= spixfer(0);
-          value2 <<= 8;
-          value2 |= spixfer(0);
+	      if (length > 5) {
+			  value2 <<= 8;
+			  value2 |= spixfer(0);
+	      }
           if (psValueB != NULL)
         	  *psValueB = value2;
       }
@@ -697,7 +719,7 @@
     float bmpe_readPressure(void) {
       int32_t adc_T, adc_P;
 
-      readBurst(BME280_REGISTER_TEMPDATA, 6, &adc_T, &adc_P, NULL);
+      readBurst(BME280_REGISTER_PRESSUREDATA, 6, &adc_P, &adc_T, NULL);
 
 #ifndef DOUBLE_PRECISION
       compensateTemperature(adc_T); // must be done first to get t_fine
@@ -772,7 +794,7 @@
 
         int32_t adc_T, adc_H;
 
-        readBurst(BME280_REGISTER_TEMPDATA, 8, &adc_T, NULL, &adc_H);
+        readBurst(BME280_REGISTER_TEMPDATA, 5, &adc_T, &adc_H, NULL);
 
 #ifndef DOUBLE_PRECISION
         compensateTemperature(adc_T); // must be done first to get t_fine
@@ -829,12 +851,15 @@
     /**************************************************************************/
     /* Read all samples in a data burst (best for NORMAL mode reading)
      *  See DS 4/4.1 on Shadow registers and data readout.
+     *  UPDATE: ORDER OF REGISTERS IS P, THEN T, THEN H
     */
     /**************************************************************************/
     void bmpe_readAllSensors(float* pfTemp, float* pfPress, float *pfAlt, float* pfHumid) {
     	int32_t adc_T, adc_P, adc_H;
+    	if (operatingMode == FORCED)
+    		bmpe_measureForcedMode();
     	int length = (bmpe_hasHumidity()? 8: 6);
-    	readBurst(BME280_REGISTER_TEMPDATA, length, &adc_T, &adc_P, &adc_H);
+    	readBurst(BME280_REGISTER_PRESSUREDATA, length, &adc_P, &adc_T, &adc_H);
     	float humid = 0.0;
 #ifndef DOUBLE_PRECISION
     	float temp = compensateTemperature(adc_T); // must be done 1st to set t_fineX

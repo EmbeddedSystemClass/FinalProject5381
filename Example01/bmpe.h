@@ -15,6 +15,7 @@
 		BMPE_BMETYPE
 	};
     extern int  bmpe_init(void);
+    extern void bmpe_measureForcedMode();
 
     extern float bmpe_readTemperature(void);
     extern float bmpe_readPressure(void);
