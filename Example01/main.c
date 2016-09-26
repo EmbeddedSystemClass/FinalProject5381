@@ -834,7 +834,7 @@ void vTaskSimple7Output( void *pvParameters )
 //#define OLEDTEST_DISPLAY_FX
 //#define OLEDTEST_TEXT_SIZE
 //#define OLEDTEST_CIRCLES
-#define OLEDTEST_POLYGONS
+//#define OLEDTEST_POLYGONS
 
 void drawTestPolygon(int fromX, int fromY, int w, int h, int color) {
 	int x0 = fromX, y0 = fromY;
